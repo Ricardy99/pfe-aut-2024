@@ -1,0 +1,304 @@
+ arch/arm/dts/sun7i-a20-bananapro.dts | 135 +++++++++-
+ arch/arm/dts/sun7i-a20.dtsi          |  28 ++
+ configs/Bananapro_defconfig          |  14 +
+ 3 files changed, 167 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/dts/sun7i-a20-bananapro.dts b/arch/arm/dts/sun7i-a20-bananapro.dts
+index 1b0b6e8408..3033a1b069 100644
+--- a/arch/arm/dts/sun7i-a20-bananapro.dts
++++ b/arch/arm/dts/sun7i-a20-bananapro.dts
+@@ -58,10 +58,60 @@
+ 
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	    backlight: backlight {
++		    compatible = "pwm-backlight";
++		    pwms = <&pwm 0 50000 0>;
++		    brightness-levels = <  0   1   1   1   1   2   2   2
++					   2   3   3   3   3   4   4   4
++					   5   5   5   6   6   6   7   7
++					   8   8   8   9   9   9  10  10
++					  10  11  11  12  12  12  13  13
++					  14  14  14  15  15  16  16  17
++					  17  17  18  18  19  19  20  20
++					  21  21  21  22  22  23  23  24
++					  24  25  25  26  26  27  27  28
++					  28  29  30  30  31  31  32  32
++					  33  33  34  35  35  36  36  37
++					  38  38  39  39  40  41  41  42
++					  43  43  44  44  45  46  47  47
++					  48  49  49  50  51  51  52  53
++					  54  54  55  56  57  57  58  59
++					  60  61  61  62  63  64  65  65
++					  66  67  68  69  70  71  71  72
++					  73  74  75  76  77  78  79  80
++					  81  82  83  84  85  86  87  88
++					  89  90  91  92  93  94  95  96
++					  97  98  99 101 102 103 104 105
++					 106 108 109 110 111 112 114 115
++					 116 117 119 120 121 123 124 125
++					 127 128 129 131 132 133 135 136
++					 138 139 141 142 144 145 147 148
++					 150 151 153 154 156 157 159 161
++					 162 164 166 167 169 171 173 174
++					 176 178 180 181 183 185 187 189
++					 191 192 194 196 198 200 202 204
++					 206 208 210 212 214 216 219 221
++					 223 225 227 229 232 234 236 238
++					 241 242 244 246 248 250 253 255>;
++		    default-brightness-level = <128>;
++		    enable-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++	    };
++
++	    panel_power: panel_power {
++		    compatible = "regulator-fixed";
++		    regulator-name = "panel-power";
++		    regulator-min-microvolt = <10400000>;
++		    regulator-max-microvolt = <10400000>;
++		    gpio = <&pio 7 12 GPIO_ACTIVE_HIGH>; /* PH12 */
++		    enable-active-high;
++		    regulator-boot-on;
++	    };
++
++
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+ 
+ 		port {
+@@ -112,10 +162,22 @@
+ 
+ &de {
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&lcd0_rgb888_pins>;
++    status = "okay";
++};
++
++&panel {
++    compatible = "bananapi,s070wv20-ct16";
++    power-supply = <&panel_power>;
++    backlight = <&backlight>;
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+ 
+ &ehci1 {
+@@ -157,10 +219,47 @@
+ 
+ &i2c2 {
+ 	status = "okay";
+ };
+ 
++&i2c3 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c3_pins>;
++    goodix: gt911@5d {
++        compatible = "goodix,gt9110", "goodix,gt911";
++        reg = <0x5d>;
++        interrupt-parent = <&pio>;
++        interrupts = <7 7 IRQ_TYPE_EDGE_FALLING>;
++//      wake-gpios = <7 7 GPIO_ACTIVE_LOW>;
++        pinctrl-names = "default";
++        pinctrl-0 = <&edt_ft5x06_pins_a &edt_ft5x06_pins_b>;
++        touchscreen-size-x = <800>;
++        touchscreen-size-y = <480>;
++        //touchscreen-inverted-x;
++        //touchscreen-inverted-y;
++        //touchscreen-swapped-x-y;
++    };
++}; 
++
++&pio {
++        edt_ft5x06_pins_a: ft5@0 { // interrupt
++                pins               = "PH7";
++                function           = "irq";
++                drive-strength     = <20>;
++                bias-pull-up;
++        };
++
++        edt_ft5x06_pins_b: ft5@1 { // reset-gpios
++                pins               = "PH8";
++                function           = "gpio_out";
++                drive-strength     = <20>;
++                bias-pull-up;
++                output-high;
++        };
++};
++
+ &ir0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir0_rx_pin>;
+ 	status = "okay";
+ };
+@@ -200,26 +299,36 @@
+ 
+ &ohci1 {
+ 	status = "okay";
+ };
+ 
+-&reg_usb1_vbus {
+-	gpio = <&pio 7 0 GPIO_ACTIVE_HIGH>; /* PH0 */
+-	status = "okay";
++&usb_otg {
++	status= "disabled";
+ };
+ 
+-&reg_usb2_vbus {
+-	gpio = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+-	status = "okay";
++&reg_usb0_vbus {
++        compatible = "regulator-fixed";
++        gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>;
++        regulator-name = "usb0-vbus";
++        regulator-min-microvolt = <5000000>;
++        regulator-max-microvolt = <5000000>;
++        enable-active-high;
++        status = "okay";
+ };
+ 
+ &spi0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&spi0_pi_pins>,
+-		    <&spi0_cs0_pi_pin>,
+-		    <&spi0_cs1_pi_pin>;
++		    <&spi0_cs0_pi_pin>;
+ 	status = "okay";
++
++        spidev@0 {
++                compatible = "spidev";
++                spi-max-frequency = <1000000>;
++                reg = <0>;
++	        status = "okay";
++        };
+ };
+ 
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
+@@ -237,12 +346,11 @@
+ 	pinctrl-0 = <&uart7_pi_pins>;
+ 	status = "okay";
+ };
+ 
+ &usbphy {
+-	usb1_vbus-supply = <&reg_usb1_vbus>;
+-	usb2_vbus-supply = <&reg_usb2_vbus>;
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
+ };
+ 
+ &reg_ahci_5v {
+ 	status = "okay";
+@@ -295,5 +403,12 @@
+ 	regulator-always-on; /* required for SATA */
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <2800000>;
+ 	regulator-name = "vddio-csi1";
+ };
++
++&pwm {
++      pinctrl-names = "default";
++      pinctrl-0 = <&pwm0_pin>, <&pwm1_pin>;
++      status = "okay";
++};
++
+diff --git a/arch/arm/dts/sun7i-a20.dtsi b/arch/arm/dts/sun7i-a20.dtsi
+index 5574299685..5c57ccb0a1 100644
+--- a/arch/arm/dts/sun7i-a20.dtsi
++++ b/arch/arm/dts/sun7i-a20.dtsi
+@@ -441,10 +441,15 @@
+ 
+ 				tcon0_out: port@1 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
++				     
++                                        tcon0_out_lcd: endpoint@0 {
++			            		reg = <0>;
++			         		remote-endpoint = <&lcd_in_tcon0>;
++				        };
+ 
+ 					tcon0_out_hdmi: endpoint@1 {
+ 						reg = <1>;
+ 						remote-endpoint = <&hdmi_in_tcon0>;
+ 						allwinner,tcon-channel = <1>;
+@@ -644,10 +649,22 @@
+ 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_AHB_SS>, <&ccu CLK_SS>;
+ 			clock-names = "ahb", "mod";
+ 		};
+ 
++		panel: panel {
++			    #address-cells = <1>;
++			    #size-cells = <0>;
++			    port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				lcd_in_tcon0: endpoint {
++				    remote-endpoint = <&tcon0_out_lcd>;
++				};
++			    };
++			};
++
+ 		hdmi: hdmi@1c16000 {
+ 			compatible = "allwinner,sun7i-a20-hdmi",
+ 				     "allwinner,sun5i-a10s-hdmi";
+ 			reg = <0x01c16000 0x1000>;
+ 			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+@@ -944,10 +961,21 @@
+ 				pins = "PD10", "PD11", "PD12", "PD13", "PD14",
+ 				       "PD15", "PD16", "PD17", "PD18", "PD19";
+ 				function = "lvds1";
+ 			};
+ 
++			lcd0_rgb888_pins: lcd0-rgb888 {
++				pins = "PD0", "PD1", "PD2", "PD3",
++				       "PD4", "PD5", "PD6", "PD7",
++				       "PD8", "PD9", "PD10", "PD11",
++				       "PD12", "PD13", "PD14", "PD15",
++				       "PD16", "PD17", "PD18", "PD19",
++				       "PD20", "PD21", "PD22", "PD23",
++				       "PD24", "PD25", "PD26", "PD27";
++				function = "lcd0";
++			};
++
+ 			/omit-if-no-ref/
+ 			mmc0_pins: mmc0-pins {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
+ 				function = "mmc0";
+diff --git a/configs/Bananapro_defconfig b/configs/Bananapro_defconfig
+index 02be8971df..8d23695a7e 100644
+--- a/configs/Bananapro_defconfig
++++ b/configs/Bananapro_defconfig
+@@ -24,5 +24,19 @@ CONFIG_MII=y
+ CONFIG_SUN7I_GMAC=y
+ CONFIG_AXP_ALDO4_VOLT=2500
+ CONFIG_SCSI=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++#7" RGB LCD
++CONFIG_VIDEO_LCD_MODE="x:800,y:480,depth:24,pclk_khz:30000,le:40,ri:40,up:29,lo:13,hs:48,vs:3,sync:3,vmode:0"
++CONFIG_VIDEO_LCD_POWER="PH12"
++CONFIG_VIDEO_LCD_BL_EN="PH9"
++CONFIG_VIDEO_LCD_BL_PWM="PB2"
++CONFIG_SPI_SUN4I=y
++CONFIG_SPI_SUN6I=y
++CONFIG_SPI=y
++CONFIG_SPI_MASTER=y
++CONFIG_EXPERIMENTAL=y
++CONFIG_SPI_SPIDEV=y
++CONFIG_RTC_HCTOSYS_DEVICE="rtc1"
++CONFIG_RTC_SYSTOHC_DEVICE="rtc1"
++
+-- 
+
