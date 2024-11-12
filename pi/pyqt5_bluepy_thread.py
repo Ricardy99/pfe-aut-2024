@@ -1,6 +1,6 @@
 import sys
 import re
-from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess
+from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess, QTimer
 from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import ( 
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy
@@ -151,6 +151,8 @@ class MainWindow(QMainWindow):
         
         # Resize the app
         self.resize(1024,600)         # f2024
+        
+        
 
         # Add Reset Button at the top of the screen
         self.buttonResetApp = QPushButton("Reset App")
@@ -285,6 +287,20 @@ class MainWindow(QMainWindow):
         self.buttonClose = QPushButton("Close App", self)
         self.buttonClose.clicked.connect(self.close)
         
+        # Création du bouton de démarrage du minuteur
+        self.start_button = QPushButton("Start Timer")  # Bouton pour démarrer le minuteur
+        self.start_button.clicked.connect(self.start_timer)  # Connecte le clic du bouton à la fonction de démarrage du minuteur
+
+        # Création du label pour afficher le décompte du minuteur
+        self.timer_label = QLabel("2:00", self)  # Affiche initialement "2:00" pour représenter 2 minutes
+        
+        # Configuration du minuteur
+        self.timer = QTimer(self)  # Initialisation de l'objet QTimer
+        self.timer.timeout.connect(self.update_timer)  # Connecte chaque expiration du minuteur à la fonction `update_timer`
+        self.timer_duration = 120  # Durée totale du minuteur (120 secondes, soit 2 minutes)
+        self.time_remaining = self.timer_duration  # Variable pour le temps restant
+
+        
 
         # Adding widgets to the main layout
         mainLayout.addWidget(self.buttonClose)          #f2024
@@ -299,6 +315,8 @@ class MainWindow(QMainWindow):
         mainLayout.addWidget(tareGroupBox)
         mainLayout.addWidget(calGroupBox)
         mainLayout.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
+        mainLayout.addWidget(self.start_button)
+        mainLayout.addWidget(self.timer_label)
 
         
         widget = QWidget()
@@ -484,12 +502,35 @@ class MainWindow(QMainWindow):
                 self.workerBLE.stop()
                 self.threadpool.waitForDone()
                 self.workerBLE = None  # Clean up the reference
+                
+    
+    def start_timer(self):
+        # Réinitialisation et démarrage du minuteur
+        self.time_remaining = self.timer_duration  # Réinitialise le temps restant
+        self.update_timer_label()  # Met à jour l'affichage du label de minuteur
+        self.timer.start(1000)  # Démarre le minuteur avec un intervalle de 1 seconde
+
+    def update_timer(self):
+        # Diminue le temps restant et met à jour le label
+        if self.time_remaining > 0:
+            self.time_remaining -= 1  # Diminue le temps restant d'une seconde
+            self.update_timer_label()  # Met à jour le label du minuteur avec le nouveau temps restant
+        else:
+            self.timer.stop()  # Arrête le minuteur lorsque le temps est écoulé
+            self.timer_label.setText("Time's up!")  # Affiche "Time's up!" lorsque le temps est écoulé
+
+    def update_timer_label(self):
+        # Met à jour le label pour afficher le temps restant au format MM:SS
+        minutes, seconds = divmod(self.time_remaining, 60)
+        self.timer_label.setText(f"{minutes}:{seconds:02}")
 
     def resetApp(self):
         # Method to reset the app
         print("Resetting the application...")
         QProcess.startDetached(sys.executable, sys.argv)  # Restart the app
         QApplication.exit()
+        
+        
 
 app = QApplication(sys.argv)
 window = MainWindow()
