@@ -5,11 +5,11 @@ from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import ( 
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy
 )
-# from bluepy import btle
+from bluepy import btle
 import time
 import datetime
 
-"""
+
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
         self.timestamp = timestamp
@@ -142,7 +142,7 @@ class WorkerBLE(QRunnable):
         self.bytestosend = bytes(tosend, 'utf-8')
         self.rqsToSend = True
         
-    """
+    
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
