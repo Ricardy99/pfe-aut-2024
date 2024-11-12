@@ -149,8 +149,6 @@ class MainWindow(QMainWindow):
 
         mainLayout = QVBoxLayout()
         
-        # Resize the app
-        self.resize(1024,600)         # f2024
 
         # Add Reset Button at the top of the screen
         self.buttonResetApp = QPushButton("Reset App")
@@ -287,7 +285,7 @@ class MainWindow(QMainWindow):
         
 
         # Adding widgets to the main layout
-        mainLayout.addWidget(self.buttonClose)          #f2024
+        mainLayout.addWidget(self.buttonClose)     # Add close app button
         mainLayout.addWidget(self.buttonResetApp)  # Add Reset Button to the top
         mainLayout.addWidget(self.buttonStartBLE)
         mainLayout.addWidget(batteryGroupBox)      # Add the Battery group box
@@ -306,8 +304,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(widget)
 
-        self.showNormal()
-        #self.show=()           #f2024
+        self.showFullScreen()
         self.threadpool = QThreadPool()
         print("Multithreading with Maximum %d threads" % self.threadpool.maxThreadCount())
 
