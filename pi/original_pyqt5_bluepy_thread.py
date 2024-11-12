@@ -2,14 +2,13 @@ import sys
 import re
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess
 from PyQt5.QtGui import QColor, QBrush
-from PyQt5.QtWidgets import ( 
+from PyQt5.QtWidgets import (
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy
 )
-# from bluepy import btle
+from bluepy import btle
 import time
 import datetime
 
-"""
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
         self.timestamp = timestamp
@@ -38,8 +37,6 @@ class SensorData:
     def is_complete(self):
         return all(sensor is not None for sensor in [self.anp35, self.anp39, self.anp37, self.anp36, self.anp34, self.anp38])
 
-    
-        
 class WorkerSignals(QObject):
     signalMsg = pyqtSignal(str)
     signalRes = pyqtSignal(str)
@@ -141,16 +138,12 @@ class WorkerBLE(QRunnable):
     def toSendBLE(self, tosend):
         self.bytestosend = bytes(tosend, 'utf-8')
         self.rqsToSend = True
-        
-    """
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         mainLayout = QVBoxLayout()
-        
-        # Resize the app
-        self.resize(1024,600)         # f2024
 
         # Add Reset Button at the top of the screen
         self.buttonResetApp = QPushButton("Reset App")
@@ -280,14 +273,8 @@ class MainWindow(QMainWindow):
         fsrLayout.addWidget(self.fsrSlider)
         fsrLayout.addWidget(self.fsrLabel)
         fsrGroupBox.setLayout(fsrLayout)
-        
-        #2 lines below f2024
-        self.buttonClose = QPushButton("Close App", self)
-        self.buttonClose.clicked.connect(self.close)
-        
 
         # Adding widgets to the main layout
-        mainLayout.addWidget(self.buttonClose)          #f2024
         mainLayout.addWidget(self.buttonResetApp)  # Add Reset Button to the top
         mainLayout.addWidget(self.buttonStartBLE)
         mainLayout.addWidget(batteryGroupBox)      # Add the Battery group box
@@ -300,14 +287,12 @@ class MainWindow(QMainWindow):
         mainLayout.addWidget(calGroupBox)
         mainLayout.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
 
-        
         widget = QWidget()
         widget.setLayout(mainLayout)
 
         self.setCentralWidget(widget)
 
-        self.showNormal()
-        #self.show=()           #f2024
+        self.showFullScreen()
         self.threadpool = QThreadPool()
         print("Multithreading with Maximum %d threads" % self.threadpool.maxThreadCount())
 
@@ -494,3 +479,4 @@ class MainWindow(QMainWindow):
 app = QApplication(sys.argv)
 window = MainWindow()
 app.exec()
+
