@@ -1,15 +1,16 @@
+
 import sys
 import re
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess, QTimer
 from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import ( 
-    QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy
+    QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy, QStackedWidget
 )
-from bluepy import btle
+#from bluepy import btle
 import time
 import datetime
 
-
+"""
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
         self.timestamp = timestamp
@@ -142,17 +143,30 @@ class WorkerBLE(QRunnable):
         self.bytestosend = bytes(tosend, 'utf-8')
         self.rqsToSend = True
         
-    
+"""    
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        mainLayout = QVBoxLayout()
-        
-        # Resize the app
-        self.resize(1024,600)         # f2024
-        
-        
+        # Create QStackedWidget that contain the pages
+        self.stackedWidget = QStackedWidget()
+        self.setCentralWidget(self.stackedWidget)
+
+        # Create pages
+        self.menuPageWidget = QWidget()
+        self.settingsPageWidget1 = QWidget()
+        self.settingsPageWidget2 = QWidget()
+
+        ##########################################################################################################
+        #                                       Menu page layout                                                 #
+        ##########################################################################################################
+        menuPageLayout = QVBoxLayout()
+
+        settingsPageButton = QPushButton("Settings")
+        settingsPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
+
+        closeButton = QPushButton("Close App")
+        closeButton.clicked.connect(self.close)
 
         # Add Reset Button at the top of the screen
         self.buttonResetApp = QPushButton("Reset App")
@@ -167,12 +181,116 @@ class MainWindow(QMainWindow):
         self.connectingLabel.setAlignment(Qt.AlignCenter)
         self.connectingLabel.setVisible(False)
 
+        # Add widget to the menu layout
+        menuPageLayout.addWidget(self.connectingLabel) # Add connecting text label to the layout
+        menuPageLayout.addWidget(self.buttonStartBLE)
+        menuPageLayout.addWidget(settingsPageButton)
+        menuPageLayout.addWidget(self.buttonResetApp)  # Add Reset Button to the top
+        menuPageLayout.addWidget(closeButton)
+
+        self.menuPageWidget.setLayout(menuPageLayout)
+        ##########################################################################################################
+
+
+
+
+        ##########################################################################################################
+        #                                       Settings page layout 1                                           #
+        ##########################################################################################################
+        settingsLayout1 = QVBoxLayout()
+
+        # Add button to the menu page
+        menuPageButton = QPushButton("Menu")
+        menuPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
+    
+        settingsPageButton2 = QPushButton("Next")
+        settingsPageButton2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget2))
+        
+        
+
         # Group Box for Battery Percentage Display
         batteryGroupBox = QGroupBox("Battery")
         self.batteryLabel = QLabel("Battery: N/A")
         batteryLayout = QVBoxLayout()
         batteryLayout.addWidget(self.batteryLabel)
         batteryGroupBox.setLayout(batteryLayout)
+
+        
+
+        
+
+        
+
+        
+
+        # Group Box for BPM Controls
+        bpmGroupBox = QGroupBox("BPM Controls")
+
+        self.bpmLabel = QLabel("BPM: 0")
+        self.bpmSlider = QSlider(Qt.Horizontal)
+        self.bpmSlider.setRange(0, 100)
+        self.bpmSlider.setValue(30)
+
+        self.tapButton = QPushButton("Tap")
+        self.tapButton.pressed.connect(self.tapBPM)
+
+        self.bpmSlider.valueChanged.connect(self.updateBPM)
+
+        bpmLayout = QVBoxLayout()
+        bpmLayout.addWidget(self.bpmLabel)
+
+        bpmControlsLayout = QHBoxLayout()
+        bpmControlsLayout.addWidget(self.tapButton)
+        bpmControlsLayout.addWidget(self.bpmSlider)
+
+        bpmLayout.addLayout(bpmControlsLayout)
+        bpmGroupBox.setLayout(bpmLayout)
+
+        # New Group Box for Cadence Controls
+        cadenceGroupBox = QGroupBox("Cadence")
+
+        self.cadenceLabel = QLabel("Cadence: 0 BPM")
+
+        cadenceLayout = QVBoxLayout()
+        cadenceLayout.addWidget(self.cadenceLabel)
+        cadenceGroupBox.setLayout(cadenceLayout)
+
+        
+
+        """
+        # Création du bouton de démarrage du minuteur
+        self.start_button = QPushButton("Start Timer")  # Bouton pour démarrer le minuteur
+        self.start_button.clicked.connect(self.start_timer)  # Connecte le clic du bouton à la fonction de démarrage du minuteur
+
+        # Création du label pour afficher le décompte du minuteur
+        #self.timer_label = QLabel("2:00", self)  # Affiche initialement "2:00" pour représenter 2 minutes
+        
+        # Configuration du minuteur
+        self.timer = QTimer(self)  # Initialisation de l'objet QTimer
+        self.timer.timeout.connect(self.update_timer)  # Connecte chaque expiration du minuteur à la fonction `update_timer`
+        self.timer_duration = 120  # Durée totale du minuteur (120 secondes, soit 2 minutes)
+        self.time_remaining = self.timer_duration  # Variable pour le temps restant
+        """
+        
+
+        # Adding widgets to the first settings layout
+        settingsLayout1.addWidget(menuPageButton)
+        settingsLayout1.addWidget(batteryGroupBox)      # Add the Battery group box
+        settingsLayout1.addWidget(bpmGroupBox)          # Add the BPM Controls group box
+        settingsLayout1.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
+        settingsLayout1.addWidget(settingsPageButton2)
+
+        self.settingsPageWidget1.setLayout(settingsLayout1)
+        ##########################################################################################################
+
+        ##########################################################################################################
+        #                                       Settings page layout 2                                           #
+        ##########################################################################################################
+        settingsLayout2 = QVBoxLayout()
+
+        # Add button to first settings page
+        settingsPageButton1 = QPushButton("Back")
+        settingsPageButton1.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
 
         # Group Box for Weight Display
         weightGroupBox = QGroupBox("Weight")
@@ -208,6 +326,21 @@ class MainWindow(QMainWindow):
         tareLayout.addWidget(buttonTare)
         tareGroupBox.setLayout(tareLayout)
 
+        # Group Box for Calibrate FSR
+        fsrGroupBox = QGroupBox("Calibrate FSR")
+
+        self.fsrSlider = QSlider(Qt.Horizontal)
+        self.fsrSlider.setRange(0, 4095)
+        self.fsrSlider.setValue(0)
+        self.fsrSlider.valueChanged.connect(self.updateFSR)
+
+        self.fsrLabel = QLabel("FSR Value: 0")
+
+        fsrLayout = QVBoxLayout()
+        fsrLayout.addWidget(self.fsrSlider)
+        fsrLayout.addWidget(self.fsrLabel)
+        fsrGroupBox.setLayout(fsrLayout)
+
         # Group Box for Calibrate Controls
         calGroupBox = QGroupBox("Calibrate Load Cells")
         calLayout = QVBoxLayout()
@@ -236,95 +369,27 @@ class MainWindow(QMainWindow):
         calLayout.addWidget(buttonCalibrateBLE)
         calGroupBox.setLayout(calLayout)
 
-        # Group Box for BPM Controls
-        bpmGroupBox = QGroupBox("BPM Controls")
+        # Adding widgets to the second settings layout
+        settingsLayout2.addWidget(weightGroupBox)       # Add the weight group box here
+        settingsLayout2.addWidget(tareGroupBox)
+        settingsLayout2.addWidget(calGroupBox)
+        settingsLayout2.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
+        settingsLayout2.addWidget(analogGroupBox)       # Add the analog values table group box
+        settingsLayout2.addWidget(settingsPageButton1)
 
-        self.bpmLabel = QLabel("BPM: 0")
-        self.bpmSlider = QSlider(Qt.Horizontal)
-        self.bpmSlider.setRange(0, 100)
-        self.bpmSlider.setValue(30)
+        self.settingsPageWidget2.setLayout(settingsLayout2)
+        ##########################################################################################################
 
-        self.tapButton = QPushButton("Tap")
-        self.tapButton.pressed.connect(self.tapBPM)
 
-        self.bpmSlider.valueChanged.connect(self.updateBPM)
+        # Add widget to the stacked widget
+        self.stackedWidget.addWidget(self.menuPageWidget)
+        self.stackedWidget.addWidget(self.settingsPageWidget1)
+        self.stackedWidget.addWidget(self.settingsPageWidget2)
 
-        bpmLayout = QVBoxLayout()
-        bpmLayout.addWidget(self.bpmLabel)
+        # Show menu page by default
+        self.stackedWidget.setCurrentWidget(self.menuPageWidget)
 
-        bpmControlsLayout = QHBoxLayout()
-        bpmControlsLayout.addWidget(self.tapButton)
-        bpmControlsLayout.addWidget(self.bpmSlider)
-
-        bpmLayout.addLayout(bpmControlsLayout)
-        bpmGroupBox.setLayout(bpmLayout)
-
-        # New Group Box for Cadence Controls
-        cadenceGroupBox = QGroupBox("Cadence")
-
-        self.cadenceLabel = QLabel("Cadence: 0 BPM")
-
-        cadenceLayout = QVBoxLayout()
-        cadenceLayout.addWidget(self.cadenceLabel)
-        cadenceGroupBox.setLayout(cadenceLayout)
-
-        # Group Box for Calibrate FSR
-        fsrGroupBox = QGroupBox("Calibrate FSR")
-
-        self.fsrSlider = QSlider(Qt.Horizontal)
-        self.fsrSlider.setRange(0, 4095)
-        self.fsrSlider.setValue(0)
-        self.fsrSlider.valueChanged.connect(self.updateFSR)
-
-        self.fsrLabel = QLabel("FSR Value: 0")
-
-        fsrLayout = QVBoxLayout()
-        fsrLayout.addWidget(self.fsrSlider)
-        fsrLayout.addWidget(self.fsrLabel)
-        fsrGroupBox.setLayout(fsrLayout)
-        
-        #2 lines below f2024
-        self.buttonClose = QPushButton("Close App", self)
-        self.buttonClose.clicked.connect(self.close)
-        
-        # Création du bouton de démarrage du minuteur
-        self.start_button = QPushButton("Start Timer")  # Bouton pour démarrer le minuteur
-        self.start_button.clicked.connect(self.start_timer)  # Connecte le clic du bouton à la fonction de démarrage du minuteur
-
-        # Création du label pour afficher le décompte du minuteur
-        self.timer_label = QLabel("2:00", self)  # Affiche initialement "2:00" pour représenter 2 minutes
-        
-        # Configuration du minuteur
-        self.timer = QTimer(self)  # Initialisation de l'objet QTimer
-        self.timer.timeout.connect(self.update_timer)  # Connecte chaque expiration du minuteur à la fonction `update_timer`
-        self.timer_duration = 120  # Durée totale du minuteur (120 secondes, soit 2 minutes)
-        self.time_remaining = self.timer_duration  # Variable pour le temps restant
-
-        
-
-        # Adding widgets to the main layout
-        mainLayout.addWidget(self.buttonClose)     # Add close app button
-        mainLayout.addWidget(self.buttonResetApp)  # Add Reset Button to the top
-        mainLayout.addWidget(self.buttonStartBLE)
-        mainLayout.addWidget(batteryGroupBox)      # Add the Battery group box
-        mainLayout.addWidget(bpmGroupBox)          # Add the BPM Controls group box
-        mainLayout.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
-        mainLayout.addWidget(self.connectingLabel) # Add connecting text label to the layout
-        mainLayout.addWidget(weightGroupBox)       # Add the weight group box here
-        mainLayout.addWidget(analogGroupBox)       # Add the analog values table group box
-        mainLayout.addWidget(tareGroupBox)
-        mainLayout.addWidget(calGroupBox)
-        mainLayout.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
-        mainLayout.addWidget(self.start_button)
-        mainLayout.addWidget(self.timer_label)
-
-        
-        widget = QWidget()
-        widget.setLayout(mainLayout)
-
-        self.setCentralWidget(widget)
-
-        self.showFullScreen()
+        #self.showFullScreen()
         self.threadpool = QThreadPool()
         print("Multithreading with Maximum %d threads" % self.threadpool.maxThreadCount())
 
@@ -533,4 +598,7 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
+window.resize(1024, 600)
+window.show()
+#window.showFullScreen()
 app.exec()
