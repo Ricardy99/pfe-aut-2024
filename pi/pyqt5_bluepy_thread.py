@@ -156,15 +156,29 @@ class MainWindow(QMainWindow):
         self.menuPageWidget = QWidget()
         self.settingsPageWidget1 = QWidget()
         self.settingsPageWidget2 = QWidget()
+        self.workoutPageWidget = QWidget()
 
         ##########################################################################################################
         #                                       Menu page layout                                                 #
         ##########################################################################################################
         menuPageLayout = QVBoxLayout()
 
+        # Add page title
+        menuPageTitle = QLabel("Menu")
+        menuPageTitle.setAlignment(Qt.AlignCenter)
+        menuPageTitle.setStyleSheet("font-size: 15px;")
+        menuPageTitle.setFixedHeight(15)
+
+
+        # Add button to the workout page
+        workoutPageButton = QPushButton("Start a workout")
+        workoutPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.workoutPageWidget))
+
+        # Add button to settings page
         settingsPageButton = QPushButton("Settings")
         settingsPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
-
+        
+        # Add a button to close the app
         closeButton = QPushButton("Close App")
         closeButton.clicked.connect(self.close)
 
@@ -182,6 +196,8 @@ class MainWindow(QMainWindow):
         self.connectingLabel.setVisible(False)
 
         # Add widget to the menu layout
+        menuPageLayout.addWidget(menuPageTitle)
+        menuPageLayout.addWidget(workoutPageButton)
         menuPageLayout.addWidget(self.connectingLabel) # Add connecting text label to the layout
         menuPageLayout.addWidget(self.buttonStartBLE)
         menuPageLayout.addWidget(settingsPageButton)
@@ -193,11 +209,16 @@ class MainWindow(QMainWindow):
 
 
 
-
         ##########################################################################################################
         #                                       Settings page layout 1                                           #
         ##########################################################################################################
         settingsLayout1 = QVBoxLayout()
+
+        # Add page title
+        settingsPageTitle1 = QLabel("Settings")
+        settingsPageTitle1.setAlignment(Qt.AlignCenter)
+        settingsPageTitle1.setStyleSheet("font-size: 15px;")
+        settingsPageTitle1.setFixedHeight(15)
 
         # Add button to the menu page
         menuPageButton = QPushButton("Menu")
@@ -206,22 +227,12 @@ class MainWindow(QMainWindow):
         settingsPageButton2 = QPushButton("Next")
         settingsPageButton2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget2))
         
-        
-
         # Group Box for Battery Percentage Display
         batteryGroupBox = QGroupBox("Battery")
         self.batteryLabel = QLabel("Battery: N/A")
         batteryLayout = QVBoxLayout()
         batteryLayout.addWidget(self.batteryLabel)
         batteryGroupBox.setLayout(batteryLayout)
-
-        
-
-        
-
-        
-
-        
 
         # Group Box for BPM Controls
         bpmGroupBox = QGroupBox("BPM Controls")
@@ -274,6 +285,7 @@ class MainWindow(QMainWindow):
         
 
         # Adding widgets to the first settings layout
+        settingsLayout1.addWidget(settingsPageTitle1)
         settingsLayout1.addWidget(menuPageButton)
         settingsLayout1.addWidget(batteryGroupBox)      # Add the Battery group box
         settingsLayout1.addWidget(bpmGroupBox)          # Add the BPM Controls group box
@@ -287,6 +299,12 @@ class MainWindow(QMainWindow):
         #                                       Settings page layout 2                                           #
         ##########################################################################################################
         settingsLayout2 = QVBoxLayout()
+
+        # Add page title
+        settingsPageTitle2 = QLabel("Calibration")
+        settingsPageTitle2.setAlignment(Qt.AlignCenter)
+        settingsPageTitle2.setStyleSheet("font-size: 15px;")
+        settingsPageTitle2.setFixedHeight(15)
 
         # Add button to first settings page
         settingsPageButton1 = QPushButton("Back")
@@ -370,6 +388,7 @@ class MainWindow(QMainWindow):
         calGroupBox.setLayout(calLayout)
 
         # Adding widgets to the second settings layout
+        settingsLayout2.addWidget(settingsPageTitle2)
         settingsLayout2.addWidget(weightGroupBox)       # Add the weight group box here
         settingsLayout2.addWidget(tareGroupBox)
         settingsLayout2.addWidget(calGroupBox)
@@ -380,11 +399,38 @@ class MainWindow(QMainWindow):
         self.settingsPageWidget2.setLayout(settingsLayout2)
         ##########################################################################################################
 
+        ##########################################################################################################
+        #                                       Workout page layout                                              #
+        ##########################################################################################################
+        workoutPageLayout = QVBoxLayout()
+
+        # Add page title
+        workoutPageTitle = QLabel("Workout")
+        workoutPageTitle.setAlignment(Qt.AlignCenter)
+        workoutPageTitle.setStyleSheet("font-size: 15px;")
+        workoutPageTitle.setFixedHeight(15)
+
+        # Add button to the menu page
+        menuPageButton_2 = QPushButton("Menu")
+        menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
+
+        # Add button to start the workout
+        startWorkoutButton = QPushButton("Start")
+
+        # Add widgets to layout
+        workoutPageLayout.addWidget(workoutPageTitle)
+        workoutPageLayout.addWidget(startWorkoutButton)
+        workoutPageLayout.addWidget(menuPageButton_2)
+
+        self.workoutPageWidget.setLayout(workoutPageLayout)
+        ##########################################################################################################
+
 
         # Add widget to the stacked widget
         self.stackedWidget.addWidget(self.menuPageWidget)
         self.stackedWidget.addWidget(self.settingsPageWidget1)
         self.stackedWidget.addWidget(self.settingsPageWidget2)
+        self.stackedWidget.addWidget(self.workoutPageWidget)
 
         # Show menu page by default
         self.stackedWidget.setCurrentWidget(self.menuPageWidget)
