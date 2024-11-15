@@ -547,7 +547,10 @@ class MainWindow(QMainWindow):
 
     def checkAndSendLightCommand(self):
         if self.current_bpm > 0 and self.current_cadence > 0:
-            lower_bound = self.current_bpm - self.current_lbo   #0.9
+            if self.current_lbo > self.current_bpm
+                lower_bound = 0
+            else:
+                lower_bound = self.current_bpm - self.current_lbo   #0.9
             upper_bound = self.current_bpm + self.current_ubo   #1.1
             if lower_bound <= self.current_cadence <= upper_bound:
                 self.sendLightCommand()
