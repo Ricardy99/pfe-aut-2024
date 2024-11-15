@@ -477,6 +477,8 @@ class MainWindow(QMainWindow):
         self.workerBLE = None
         self.current_bpm = 0
         self.current_cadence = 0
+        self.current_lbo = 0
+        self.current_ubo = 0
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
