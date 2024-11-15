@@ -489,10 +489,12 @@ class MainWindow(QMainWindow):
     def updateLBO(self, value):
         self.lowerBoundOffsetLabel.setText(f"Lower bound offset: {value}")
         self.current_lbo = value
+        self.checkAndSendLightCommand()
 
     def updateUBO(self, value):
         self.upperBoundOffsetLabel.setText(f"Upper bound offset: {value}")
         self.current_ubo = value
+        self.checkAndSendLightCommand()
 
     def tapBPM(self):
         now = datetime.datetime.now()
@@ -547,7 +549,7 @@ class MainWindow(QMainWindow):
 
     def checkAndSendLightCommand(self):
         if self.current_bpm > 0 and self.current_cadence > 0:
-            if self.current_lbo > self.current_bpm
+            if self.current_lbo > self.current_bpm:
                 lower_bound = 0
             else:
                 lower_bound = self.current_bpm - self.current_lbo   #0.9
