@@ -172,6 +172,11 @@ class MainWindow(QMainWindow):
 
         # Add button to the workout page
         workoutPageButton = QPushButton("Start a workout")
+        #workoutPageButton.setAlignment(Qt.AlignCenter)
+        #workoutPageButton.setMinimumWidth(100)
+        #workoutPageButton.setMaximumWidth(200)
+        #workoutPageButton.setFixedWidth(150)
+        #workoutPageButton.setStyleSheet("width: 50px;")
         workoutPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.workoutPageWidget))
 
         # Add button to settings page
@@ -218,7 +223,7 @@ class MainWindow(QMainWindow):
         settingsPageTitle1 = QLabel("Settings")
         settingsPageTitle1.setAlignment(Qt.AlignCenter)
         settingsPageTitle1.setStyleSheet("font-size: 15px;")
-        settingsPageTitle1.setFixedHeight(15)
+        settingsPageTitle1.setFixedHeight(19)
 
         # Add button to the menu page
         menuPageButton = QPushButton("Menu")
@@ -242,10 +247,22 @@ class MainWindow(QMainWindow):
         self.bpmSlider.setRange(0, 100)
         self.bpmSlider.setValue(30)
 
+        self.lowerBoundOffsetLabel = QLabel("Lower bound offset: 0")
+        self.lowerBoundOffsetSlider = QSlider(Qt.Horizontal)
+        self.lowerBoundOffsetSlider.setRange(0, 20)
+        self.lowerBoundOffsetSlider.setValue(0)
+
+        self.upperBoundOffsetLabel = QLabel("Upper bound offset: 0")
+        self.upperBoundOffsetSlider = QSlider(Qt.Horizontal)
+        self.upperBoundOffsetSlider.setRange(0, 20)
+        self.upperBoundOffsetSlider.setValue(0)
+
         self.tapButton = QPushButton("Tap")
         self.tapButton.pressed.connect(self.tapBPM)
 
         self.bpmSlider.valueChanged.connect(self.updateBPM)
+        self.lowerBoundOffsetSlider.valueChanged.connect(self.updateLBO)
+        self.upperBoundOffsetSlider.valueChanged.connect(self.updateUBO)
 
         bpmLayout = QVBoxLayout()
         bpmLayout.addWidget(self.bpmLabel)
@@ -254,7 +271,17 @@ class MainWindow(QMainWindow):
         bpmControlsLayout.addWidget(self.tapButton)
         bpmControlsLayout.addWidget(self.bpmSlider)
 
+        lowerBoundOffsetLayout = QHBoxLayout()
+        lowerBoundOffsetLayout.addWidget(self.lowerBoundOffsetLabel)
+        lowerBoundOffsetLayout.addWidget(self.lowerBoundOffsetSlider)
+
+        upperBoundOffsetLayout = QHBoxLayout()
+        upperBoundOffsetLayout.addWidget(self.upperBoundOffsetLabel)
+        upperBoundOffsetLayout.addWidget(self.upperBoundOffsetSlider)
+
         bpmLayout.addLayout(bpmControlsLayout)
+        bpmLayout.addLayout(lowerBoundOffsetLayout)
+        bpmLayout.addLayout(upperBoundOffsetLayout)
         bpmGroupBox.setLayout(bpmLayout)
 
         # New Group Box for Cadence Controls
@@ -459,6 +486,14 @@ class MainWindow(QMainWindow):
         self.current_bpm = value
         self.checkAndSendLightCommand()
 
+    def updateLBO(self, value):
+        self.lowerBoundOffsetLabel.setText(f"Lower bound offset: {value}")
+        self.current_lbo = value
+
+    def updateUBO(self, value):
+        self.upperBoundOffsetLabel.setText(f"Upper bound offset: {value}")
+        self.current_ubo = value
+
     def tapBPM(self):
         now = datetime.datetime.now()
         self.tap_times.append(now)
@@ -512,8 +547,8 @@ class MainWindow(QMainWindow):
 
     def checkAndSendLightCommand(self):
         if self.current_bpm > 0 and self.current_cadence > 0:
-            lower_bound = self.current_bpm * 0.9
-            upper_bound = self.current_bpm * 1.1
+            lower_bound = self.current_bpm - self.current_lbo   #0.9
+            upper_bound = self.current_bpm + self.current_ubo   #1.1
             if lower_bound <= self.current_cadence <= upper_bound:
                 self.sendLightCommand()
             else:
