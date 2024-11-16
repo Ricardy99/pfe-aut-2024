@@ -169,6 +169,8 @@ class MainWindow(QMainWindow):
         menuPageTitle.setStyleSheet("font-size: 15px;")
         menuPageTitle.setFixedHeight(15)
 
+        
+
 
         # Add button to the workout page
         workoutPageButton = QPushButton("Start a workout")
@@ -177,11 +179,11 @@ class MainWindow(QMainWindow):
         #workoutPageButton.setMaximumWidth(200)
         #workoutPageButton.setFixedWidth(150)
         #workoutPageButton.setStyleSheet("width: 50px;")
-        workoutPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.workoutPageWidget))
+        workoutPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
 
         # Add button to settings page
-        settingsPageButton = QPushButton("Settings")
-        settingsPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
+        settingsPageButton = QPushButton("Calibration")
+        settingsPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget2))
         
         # Add a button to close the app
         closeButton = QPushButton("Close App")
@@ -225,19 +227,14 @@ class MainWindow(QMainWindow):
         settingsPageTitle1.setStyleSheet("font-size: 15px;")
         settingsPageTitle1.setFixedHeight(19)
 
-        # Add button to the menu page
-        menuPageButton = QPushButton("Menu")
-        menuPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
     
+        # Add button to the calibration page
         settingsPageButton2 = QPushButton("Next")
         settingsPageButton2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget2))
         
-        # Group Box for Battery Percentage Display
-        batteryGroupBox = QGroupBox("Battery")
-        self.batteryLabel = QLabel("Battery: N/A")
-        batteryLayout = QVBoxLayout()
-        batteryLayout.addWidget(self.batteryLabel)
-        batteryGroupBox.setLayout(batteryLayout)
+        # Add button to start the workout
+        startWorkoutButton = QPushButton("Start")
+        startWorkoutButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.workoutPageWidget))
 
         # Group Box for BPM Controls
         bpmGroupBox = QGroupBox("BPM Controls")
@@ -246,6 +243,9 @@ class MainWindow(QMainWindow):
         self.bpmSlider = QSlider(Qt.Horizontal)
         self.bpmSlider.setRange(0, 100)
         self.bpmSlider.setValue(30)
+
+        self.lowerBoundLabel = QLabel("Lower Bound: 0")
+        self.upperBoundLabel = QLabel("Upper Bound: 0")
 
         self.lowerBoundOffsetLabel = QLabel("Lower bound offset: 0")
         self.lowerBoundOffsetSlider = QSlider(Qt.Horizontal)
@@ -265,7 +265,9 @@ class MainWindow(QMainWindow):
         self.upperBoundOffsetSlider.valueChanged.connect(self.updateUBO)
 
         bpmLayout = QVBoxLayout()
+        bpmLayout.addWidget(self.lowerBoundLabel)
         bpmLayout.addWidget(self.bpmLabel)
+        bpmLayout.addWidget(self.upperBoundLabel)
 
         bpmControlsLayout = QHBoxLayout()
         bpmControlsLayout.addWidget(self.tapButton)
@@ -284,16 +286,10 @@ class MainWindow(QMainWindow):
         bpmLayout.addLayout(upperBoundOffsetLayout)
         bpmGroupBox.setLayout(bpmLayout)
 
-        # New Group Box for Cadence Controls
-        cadenceGroupBox = QGroupBox("Cadence")
 
-        self.cadenceLabel = QLabel("Cadence: 0 BPM")
-
-        cadenceLayout = QVBoxLayout()
-        cadenceLayout.addWidget(self.cadenceLabel)
-        cadenceGroupBox.setLayout(cadenceLayout)
-
-        
+        # Add button to the menu page
+        menuPageButton = QPushButton("Back")
+        menuPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
 
         """
         # Création du bouton de démarrage du minuteur
@@ -313,11 +309,10 @@ class MainWindow(QMainWindow):
 
         # Adding widgets to the first settings layout
         settingsLayout1.addWidget(settingsPageTitle1)
+        settingsLayout1.addWidget(startWorkoutButton)
+        settingsLayout1.addWidget(bpmGroupBox)
         settingsLayout1.addWidget(menuPageButton)
-        settingsLayout1.addWidget(batteryGroupBox)      # Add the Battery group box
-        settingsLayout1.addWidget(bpmGroupBox)          # Add the BPM Controls group box
-        settingsLayout1.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
-        settingsLayout1.addWidget(settingsPageButton2)
+        #settingsLayout1.addWidget(settingsPageButton2)
 
         self.settingsPageWidget1.setLayout(settingsLayout1)
         ##########################################################################################################
@@ -335,7 +330,15 @@ class MainWindow(QMainWindow):
 
         # Add button to first settings page
         settingsPageButton1 = QPushButton("Back")
-        settingsPageButton1.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
+        settingsPageButton1.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
+
+        # Group Box for Battery Percentage Display
+        batteryGroupBox = QGroupBox("Battery")
+        batteryGroupBox.setMaximumHeight(50)
+        self.batteryLabel = QLabel("Battery: N/A")
+        batteryLayout = QVBoxLayout()
+        batteryLayout.addWidget(self.batteryLabel)
+        batteryGroupBox.setLayout(batteryLayout)
 
         # Group Box for Weight Display
         weightGroupBox = QGroupBox("Weight")
@@ -343,23 +346,6 @@ class MainWindow(QMainWindow):
         weightLayout = QVBoxLayout()
         weightLayout.addWidget(self.weightLabel)
         weightGroupBox.setLayout(weightLayout)
-
-        # Group Box for Analog Values Table
-        analogGroupBox = QGroupBox("Analog Values")
-
-        self.timestampLabel = QLabel("Timestamp: N/A")
-        self.analogTable = QTableWidget(6, 1)  # 6 rows, 1 column
-        # Remove header labels
-        self.analogTable.horizontalHeader().setVisible(False)
-        self.analogTable.verticalHeader().setVisible(False)
-        self.analogTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.analogTable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-#        self.analogTable.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        
-        analogLayout = QVBoxLayout()
-        analogLayout.addWidget(self.timestampLabel)
-        analogLayout.addWidget(self.analogTable)
-        analogGroupBox.setLayout(analogLayout)
 
         # Group Box for Tare Controls
         tareGroupBox = QGroupBox("Tare")
@@ -416,11 +402,11 @@ class MainWindow(QMainWindow):
 
         # Adding widgets to the second settings layout
         settingsLayout2.addWidget(settingsPageTitle2)
+        settingsLayout2.addWidget(batteryGroupBox)      # Add the Battery group box
         settingsLayout2.addWidget(weightGroupBox)       # Add the weight group box here
         settingsLayout2.addWidget(tareGroupBox)
         settingsLayout2.addWidget(calGroupBox)
         settingsLayout2.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
-        settingsLayout2.addWidget(analogGroupBox)       # Add the analog values table group box
         settingsLayout2.addWidget(settingsPageButton1)
 
         self.settingsPageWidget2.setLayout(settingsLayout2)
@@ -437,16 +423,42 @@ class MainWindow(QMainWindow):
         workoutPageTitle.setStyleSheet("font-size: 15px;")
         workoutPageTitle.setFixedHeight(15)
 
+        # New Group Box for Cadence Controls
+        cadenceGroupBox = QGroupBox("Cadence")
+
+        self.cadenceLabel = QLabel("Cadence: 0 BPM")
+
+        cadenceLayout = QVBoxLayout()
+        cadenceLayout.addWidget(self.cadenceLabel)
+        cadenceGroupBox.setLayout(cadenceLayout)
+
+        # Group Box for Analog Values Table
+        analogGroupBox = QGroupBox("Analog Values")
+
+        self.timestampLabel = QLabel("Timestamp: N/A")
+        self.analogTable = QTableWidget(6, 1)  # 6 rows, 1 column
+        # Remove header labels
+        self.analogTable.horizontalHeader().setVisible(False)
+        self.analogTable.verticalHeader().setVisible(False)
+        self.analogTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.analogTable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+#        self.analogTable.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        analogLayout = QVBoxLayout()
+        analogLayout.addWidget(self.timestampLabel)
+        analogLayout.addWidget(self.analogTable)
+        analogGroupBox.setLayout(analogLayout)
+
         # Add button to the menu page
-        menuPageButton_2 = QPushButton("Menu")
+        menuPageButton_2 = QPushButton("End workout")
         menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
 
-        # Add button to start the workout
-        startWorkoutButton = QPushButton("Start")
+        
 
         # Add widgets to layout
         workoutPageLayout.addWidget(workoutPageTitle)
-        workoutPageLayout.addWidget(startWorkoutButton)
+        workoutPageLayout.addWidget(cadenceGroupBox)
+        workoutPageLayout.addWidget(analogGroupBox)
         workoutPageLayout.addWidget(menuPageButton_2)
 
         self.workoutPageWidget.setLayout(workoutPageLayout)
@@ -479,6 +491,9 @@ class MainWindow(QMainWindow):
         self.current_cadence = 0
         self.current_lbo = 0
         self.current_ubo = 0
+        self.lower_bound = 0
+        self.upper_bound = 0
+
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
@@ -486,17 +501,33 @@ class MainWindow(QMainWindow):
     def updateBPM(self, value):
         self.bpmLabel.setText(f"BPM: {value}")
         self.current_bpm = value
+        self.updateLBLabel()
+        self.updateUBLabel()
         self.checkAndSendLightCommand()
 
     def updateLBO(self, value):
         self.lowerBoundOffsetLabel.setText(f"Lower bound offset: {value}")
         self.current_lbo = value
+        self.updateLBLabel()
+        self.updateUBLabel()
         self.checkAndSendLightCommand()
 
     def updateUBO(self, value):
         self.upperBoundOffsetLabel.setText(f"Upper bound offset: {value}")
         self.current_ubo = value
+        self.updateLBLabel()
+        self.updateUBLabel()
         self.checkAndSendLightCommand()
+
+    def updateLBLabel(self):
+        if self.current_lbo > self.current_bpm:
+            self.lowerBoundLabel.setText(f"Lower bound: {0}")
+        else:
+            self.lowerBoundLabel.setText(f"Lower bound: {self.current_bpm - self.current_lbo}")
+        
+
+    def updateUBLabel(self):
+        self.upperBoundLabel.setText(f"Upper bound: {self.current_bpm + self.current_ubo}")
 
     def tapBPM(self):
         now = datetime.datetime.now()
@@ -552,11 +583,13 @@ class MainWindow(QMainWindow):
     def checkAndSendLightCommand(self):
         if self.current_bpm > 0 and self.current_cadence > 0:
             if self.current_lbo > self.current_bpm:
-                lower_bound = 0
+                self.lower_bound = 0
             else:
-                lower_bound = self.current_bpm - self.current_lbo   #0.9
-            upper_bound = self.current_bpm + self.current_ubo   #1.1
-            if lower_bound <= self.current_cadence <= upper_bound:
+                self.lower_bound = self.current_bpm - self.current_lbo   #0.9
+            self.upper_bound = self.current_bpm + self.current_ubo   #1.1
+            #self.lowerBoundLabel.setText(f"Lower bound: {self.lower_bound}")
+            #self.upperBoundLabel.setText(f"Upper bound: {self.upper_bound}")
+            if self.lower_bound <= self.current_cadence <= self.upper_bound:
                 self.sendLightCommand()
             else:
                 if self.current_cadence > self.current_bpm:
