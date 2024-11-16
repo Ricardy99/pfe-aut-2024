@@ -422,14 +422,19 @@ class MainWindow(QMainWindow):
         workoutPageTitle.setAlignment(Qt.AlignCenter)
         workoutPageTitle.setStyleSheet("font-size: 15px;")
         workoutPageTitle.setFixedHeight(15)
+        
 
         # New Group Box for Cadence Controls
         cadenceGroupBox = QGroupBox("Cadence")
 
         self.cadenceLabel = QLabel("Cadence: 0 BPM")
 
+        self.cadenceFeedbackLabel = QLabel("")
+        self.cadenceFeedbackLabel.setAlignment(Qt.AlignCenter)
+
         cadenceLayout = QVBoxLayout()
         cadenceLayout.addWidget(self.cadenceLabel)
+        cadenceLayout.addWidget(self.cadenceFeedbackLabel)
         cadenceGroupBox.setLayout(cadenceLayout)
 
         # Group Box for Analog Values Table
@@ -501,33 +506,35 @@ class MainWindow(QMainWindow):
     def updateBPM(self, value):
         self.bpmLabel.setText(f"BPM: {value}")
         self.current_bpm = value
-        self.updateLBLabel()
-        self.updateUBLabel()
+        self.updateLB()
+        self.updateUB()
         self.checkAndSendLightCommand()
 
     def updateLBO(self, value):
         self.lowerBoundOffsetLabel.setText(f"Lower bound offset: {value}")
         self.current_lbo = value
-        self.updateLBLabel()
-        self.updateUBLabel()
+        self.updateLB()
+        self.updateUB()
         self.checkAndSendLightCommand()
 
     def updateUBO(self, value):
         self.upperBoundOffsetLabel.setText(f"Upper bound offset: {value}")
         self.current_ubo = value
-        self.updateLBLabel()
-        self.updateUBLabel()
+        self.updateLB()
+        self.updateUB()
         self.checkAndSendLightCommand()
 
-    def updateLBLabel(self):
+    def updateLB(self):
         if self.current_lbo > self.current_bpm:
-            self.lowerBoundLabel.setText(f"Lower bound: {0}")
+            self.lower_bound = 0
         else:
-            self.lowerBoundLabel.setText(f"Lower bound: {self.current_bpm - self.current_lbo}")
+            self.lower_bound = self.current_bpm - self.current_lbo
+        self.lowerBoundLabel.setText(f"Lower bound: {self.lower_bound}")
         
 
-    def updateUBLabel(self):
-        self.upperBoundLabel.setText(f"Upper bound: {self.current_bpm + self.current_ubo}")
+    def updateUB(self):
+        self.upper_bound = self.current_bpm + self.current_ubo
+        self.upperBoundLabel.setText(f"Upper bound: {self.upper_bound}")
 
     def tapBPM(self):
         now = datetime.datetime.now()
@@ -587,15 +594,16 @@ class MainWindow(QMainWindow):
             else:
                 self.lower_bound = self.current_bpm - self.current_lbo   #0.9
             self.upper_bound = self.current_bpm + self.current_ubo   #1.1
-            #self.lowerBoundLabel.setText(f"Lower bound: {self.lower_bound}")
-            #self.upperBoundLabel.setText(f"Upper bound: {self.upper_bound}")
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
+                self.cadenceFeedbackLabel.setText(f"On pace")
                 self.sendLightCommand()
             else:
                 if self.current_cadence > self.current_bpm:
+                    self.cadenceFeedbackLabel.setText(f"Faster")
                     self.workerBLE.toSendBLE("Faster")
                     print("Sent 'Faster' command")
                 elif self.current_cadence < self.current_bpm:
+                    self.cadenceFeedbackLabel.setText(f"Slower")
                     self.workerBLE.toSendBLE("Slower")
                     print("Sent 'Slower' command")
 
