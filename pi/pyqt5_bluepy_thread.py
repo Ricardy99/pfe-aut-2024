@@ -6,11 +6,11 @@ from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import ( 
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy, QStackedWidget
 )
-from bluepy import btle
+#from bluepy import btle
 import time
 import datetime
 
-#"""
+"""
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
         self.timestamp = timestamp
@@ -143,7 +143,7 @@ class WorkerBLE(QRunnable):
         self.bytestosend = bytes(tosend, 'utf-8')
         self.rqsToSend = True
         
-#"""    
+"""    
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -235,6 +235,7 @@ class MainWindow(QMainWindow):
         # Add button to start the workout
         startWorkoutButton = QPushButton("Start")
         startWorkoutButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.workoutPageWidget))
+        startWorkoutButton.clicked.connect(self.startTimer)
 
         # Group Box for BPM Controls
         bpmGroupBox = QGroupBox("BPM Controls")
@@ -291,25 +292,37 @@ class MainWindow(QMainWindow):
         menuPageButton = QPushButton("Back")
         menuPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
 
-        """
-        # Création du bouton de démarrage du minuteur
-        self.start_button = QPushButton("Start Timer")  # Bouton pour démarrer le minuteur
-        self.start_button.clicked.connect(self.start_timer)  # Connecte le clic du bouton à la fonction de démarrage du minuteur
+        
+        # Group box for timer control
+        timerControlGroupBox = QGroupBox("Timer Controls")
 
-        # Création du label pour afficher le décompte du minuteur
-        #self.timer_label = QLabel("2:00", self)  # Affiche initialement "2:00" pour représenter 2 minutes
-        
-        # Configuration du minuteur
+        # Création du bouton de démarrage du minuteur
+        #self.start_button = QPushButton("Start Timer")  # Bouton pour démarrer le minuteur
+        #self.start_button.clicked.connect(self.start_timer)  # Connecte le clic du bouton à la fonction de démarrage du minuteur
+
+        self.timerControlLabel = QLabel("120 s", self)
+       
         self.timer = QTimer(self)  # Initialisation de l'objet QTimer
-        self.timer.timeout.connect(self.update_timer)  # Connecte chaque expiration du minuteur à la fonction `update_timer`
-        self.timer_duration = 120  # Durée totale du minuteur (120 secondes, soit 2 minutes)
-        self.time_remaining = self.timer_duration  # Variable pour le temps restant
-        """
+        #self.timer.timeout.connect(self.update_timer)  # Connecte chaque expiration du minuteur à la fonction `update_timer`
+        self.timerDuration = 120  # Durée totale du minuteur (120 secondes, soit 2 minutes)
+        #self.time_remaining = self.timerDuration  # Variable pour le temps restant
+
+        self.timerSlider = QSlider(Qt.Horizontal)
+        self.timerSlider.setRange(0, 600)
+        self.timerSlider.setTickInterval(10)
+        self.timerSlider.setValue(120)
+        self.timerSlider.valueChanged.connect(self.updateControlTimer)
         
+        timerControlLayout = QVBoxLayout()
+        timerControlLayout.addWidget(self.timerControlLabel)
+        timerControlLayout.addWidget(self.timerSlider)
+        timerControlGroupBox.setLayout(timerControlLayout)
+
 
         # Adding widgets to the first settings layout
         settingsLayout1.addWidget(settingsPageTitle1)
         settingsLayout1.addWidget(startWorkoutButton)
+        settingsLayout1.addWidget(timerControlGroupBox)
         settingsLayout1.addWidget(bpmGroupBox)
         settingsLayout1.addWidget(menuPageButton)
         #settingsLayout1.addWidget(settingsPageButton2)
@@ -422,6 +435,17 @@ class MainWindow(QMainWindow):
         workoutPageTitle.setAlignment(Qt.AlignCenter)
         workoutPageTitle.setStyleSheet("font-size: 15px;")
         workoutPageTitle.setFixedHeight(15)
+
+        # Add timer
+        #self.timer = QTimer(self)  # Initialisation de l'objet QTimer
+        self.timer.timeout.connect(self.updateTimer)  # Connecte chaque expiration du minuteur à la fonction `update_timer`
+        #self.timerDuration = 120  # Durée totale du minuteur (120 secondes, soit 2 minutes)
+        self.timeRemaining = self.timerDuration  # Variable pour le temps restant
+
+        self.timerLabel = QLabel(f"timer: {self.timeRemaining} s")
+
+        #self.startTimer()
+
         
 
         # New Group Box for Cadence Controls
@@ -457,11 +481,13 @@ class MainWindow(QMainWindow):
         # Add button to the menu page
         menuPageButton_2 = QPushButton("End workout")
         menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
+        menuPageButton_2.clicked.connect(self.stopTimer)
 
         
 
         # Add widgets to layout
         workoutPageLayout.addWidget(workoutPageTitle)
+        workoutPageLayout.addWidget(self.timerLabel)
         workoutPageLayout.addWidget(cadenceGroupBox)
         workoutPageLayout.addWidget(analogGroupBox)
         workoutPageLayout.addWidget(menuPageButton_2)
@@ -696,26 +722,32 @@ class MainWindow(QMainWindow):
                 self.threadpool.waitForDone()
                 self.workerBLE = None  # Clean up the reference
                 
-    
-    def start_timer(self):
+    def updateControlTimer(self, value):
+        self.timerDuration = value
+        self.timerControlLabel.setText(f"{self.timerDuration} s")
+
+    def startTimer(self):
         # Réinitialisation et démarrage du minuteur
-        self.time_remaining = self.timer_duration  # Réinitialise le temps restant
-        self.update_timer_label()  # Met à jour l'affichage du label de minuteur
+        self.timeRemaining = self.timerDuration  # Réinitialise le temps restant
+        self.updateTimerLabel()  # Met à jour l'affichage du label de minuteur
         self.timer.start(1000)  # Démarre le minuteur avec un intervalle de 1 seconde
 
-    def update_timer(self):
+    def stopTimer(self):
+        self.timer.stop()
+
+    def updateTimer(self):
         # Diminue le temps restant et met à jour le label
-        if self.time_remaining > 0:
-            self.time_remaining -= 1  # Diminue le temps restant d'une seconde
-            self.update_timer_label()  # Met à jour le label du minuteur avec le nouveau temps restant
+        if self.timeRemaining > 0:
+            self.timeRemaining -= 1  # Diminue le temps restant d'une seconde
+            self.updateTimerLabel()  # Met à jour le label du minuteur avec le nouveau temps restant
         else:
             self.timer.stop()  # Arrête le minuteur lorsque le temps est écoulé
-            self.timer_label.setText("Time's up!")  # Affiche "Time's up!" lorsque le temps est écoulé
+            self.updateTimerLabel.setText("Time's up!")  # Affiche "Time's up!" lorsque le temps est écoulé
 
-    def update_timer_label(self):
+    def updateTimerLabel(self):
         # Met à jour le label pour afficher le temps restant au format MM:SS
-        minutes, seconds = divmod(self.time_remaining, 60)
-        self.timer_label.setText(f"{minutes}:{seconds:02}")
+        #minutes, seconds = divmod(self.time_remaining, 60)
+        self.timerLabel.setText(f"timer: {self.timeRemaining} s")
 
     def resetApp(self):
         # Method to reset the app
