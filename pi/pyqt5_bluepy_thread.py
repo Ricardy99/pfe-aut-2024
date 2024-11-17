@@ -742,7 +742,7 @@ class MainWindow(QMainWindow):
             self.updateTimerLabel()  # Met à jour le label du minuteur avec le nouveau temps restant
         else:
             self.timer.stop()  # Arrête le minuteur lorsque le temps est écoulé
-            self.updateTimerLabel.setText("Time's up!")  # Affiche "Time's up!" lorsque le temps est écoulé
+            self.timerLabel.setText("Time's up!")  # Affiche "Time's up!" lorsque le temps est écoulé
 
     def updateTimerLabel(self):
         # Met à jour le label pour afficher le temps restant au format MM:SS
