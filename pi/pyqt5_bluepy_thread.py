@@ -445,8 +445,18 @@ class MainWindow(QMainWindow):
         self.cadenceFeedbackLabel.setAlignment(Qt.AlignCenter)
         self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
 
+        self.onPaceCountLabel = QLabel("On pace count: 0")
+        self.fasterCountLabel = QLabel("Faster count: 0")
+        self.slowerCountLabel = QLabel("Slower count: 0")
+
         cadenceLayout = QVBoxLayout()
-        cadenceLayout.addWidget(self.cadenceLabel)
+        cadenceDisplayLayout = QHBoxLayout()
+        cadenceDisplayLayout.addWidget(self.cadenceLabel)
+        cadenceDisplayLayout.addWidget(self.slowerCountLabel)
+        cadenceDisplayLayout.addWidget(self.onPaceCountLabel)
+        cadenceDisplayLayout.addWidget(self.fasterCountLabel)
+        #cadenceLayout.addWidget(self.cadenceLabel)
+        cadenceLayout.addLayout(cadenceDisplayLayout)
         cadenceLayout.addWidget(self.cadenceFeedbackLabel)
         cadenceGroupBox.setLayout(cadenceLayout)
 
@@ -617,18 +627,21 @@ class MainWindow(QMainWindow):
             self.upper_bound = self.current_bpm + self.current_ubo   #1.1
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
                 self.onPace_count += 1
+                self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
                 self.cadenceFeedbackLabel.setText(f"On pace")
                 self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
                 self.sendLightCommand()
             else:
                 if self.current_cadence < self.current_bpm:
                     self.faster_count += 1
+                    self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
                     self.cadenceFeedbackLabel.setText(f"Faster")
                     self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Faster")
                     print("Sent 'Faster' command")
                 elif self.current_cadence > self.current_bpm:
                     self.slower_count += 1
+                    self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
                     self.cadenceFeedbackLabel.setText(f"Slower")
                     self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Slower")
