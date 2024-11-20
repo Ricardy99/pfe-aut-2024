@@ -236,15 +236,15 @@ class MainWindow(QMainWindow):
         self.bpmSlider.setRange(0, 100)
         self.bpmSlider.setValue(30)
 
-        self.lowerBoundLabel = QLabel("Lower Bound: 0")
-        self.upperBoundLabel = QLabel("Upper Bound: 0")
+        self.lowerBoundLabel = QLabel("Lower limit: 0")
+        self.upperBoundLabel = QLabel("Upper limit: 0")
 
-        self.lowerBoundOffsetLabel = QLabel("Lower bound offset: 0")
+        self.lowerBoundOffsetLabel = QLabel("Lower limit offset: 0")
         self.lowerBoundOffsetSlider = QSlider(Qt.Horizontal)
         self.lowerBoundOffsetSlider.setRange(0, 20)
         self.lowerBoundOffsetSlider.setValue(0)
 
-        self.upperBoundOffsetLabel = QLabel("Upper bound offset: 0")
+        self.upperBoundOffsetLabel = QLabel("Upper limit offset: 0")
         self.upperBoundOffsetSlider = QSlider(Qt.Horizontal)
         self.upperBoundOffsetSlider.setRange(0, 20)
         self.upperBoundOffsetSlider.setValue(0)
@@ -265,6 +265,7 @@ class MainWindow(QMainWindow):
         bpmDisplayLayout.addWidget(self.lowerBoundLabel)
         bpmDisplayLayout.addWidget(self.bpmLabel)
         bpmDisplayLayout.addWidget(self.upperBoundLabel)
+        #bpmDisplayLayout.setAlignment(Qt.AlignCenter)
 
         bpmControlsLayout = QHBoxLayout()
         bpmControlsLayout.addWidget(self.tapButton)
@@ -298,7 +299,7 @@ class MainWindow(QMainWindow):
 
         self.timerSlider = QSlider(Qt.Horizontal)
         self.timerSlider.setRange(0, 600)
-        self.timerSlider.setTickInterval(10)
+        self.timerSlider.setSingleStep(10)
         self.timerSlider.setValue(120)
         self.timerSlider.valueChanged.connect(self.updateControlTimer)
         
@@ -436,11 +437,13 @@ class MainWindow(QMainWindow):
 
         # New Group Box for Cadence Controls
         cadenceGroupBox = QGroupBox("Cadence")
+        #cadenceGroupBox.setStyleSheet("QGroupBox {background-color: #1abf08;}")
 
         self.cadenceLabel = QLabel("Cadence: 0 BPM")
 
         self.cadenceFeedbackLabel = QLabel("On pace")
         self.cadenceFeedbackLabel.setAlignment(Qt.AlignCenter)
+        self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
 
         cadenceLayout = QVBoxLayout()
         cadenceLayout.addWidget(self.cadenceLabel)
@@ -507,7 +510,16 @@ class MainWindow(QMainWindow):
         self.current_ubo = 0
         self.lower_bound = 0
         self.upper_bound = 0
+        self.onPace_count = 0
+        self.faster_count = 0
+        self.slower_count = 0
+        self.fasterCount_allowed = 0
+        self.slowerCount_allowed = 0
 
+    def resetCounters(self):
+        self.onPace_count = 0
+        self.faster_count = 0
+        self.slower_count = 0
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
@@ -520,14 +532,14 @@ class MainWindow(QMainWindow):
         self.checkAndSendLightCommand()
 
     def updateLBO(self, value):
-        self.lowerBoundOffsetLabel.setText(f"Lower bound offset: {value}")
+        self.lowerBoundOffsetLabel.setText(f"Lower limit offset: {value}")
         self.current_lbo = value
         self.updateLB()
         self.updateUB()
         self.checkAndSendLightCommand()
 
     def updateUBO(self, value):
-        self.upperBoundOffsetLabel.setText(f"Upper bound offset: {value}")
+        self.upperBoundOffsetLabel.setText(f"Upper limit offset: {value}")
         self.current_ubo = value
         self.updateLB()
         self.updateUB()
@@ -538,12 +550,12 @@ class MainWindow(QMainWindow):
             self.lower_bound = 0
         else:
             self.lower_bound = self.current_bpm - self.current_lbo
-        self.lowerBoundLabel.setText(f"Lower bound: {self.lower_bound}")
+        self.lowerBoundLabel.setText(f"Lower limit: {self.lower_bound}")
         
 
     def updateUB(self):
         self.upper_bound = self.current_bpm + self.current_ubo
-        self.upperBoundLabel.setText(f"Upper bound: {self.upper_bound}")
+        self.upperBoundLabel.setText(f"Upper limit: {self.upper_bound}")
 
     def tapBPM(self):
         now = datetime.datetime.now()
@@ -604,15 +616,21 @@ class MainWindow(QMainWindow):
                 self.lower_bound = self.current_bpm - self.current_lbo   #0.9
             self.upper_bound = self.current_bpm + self.current_ubo   #1.1
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
+                self.onPace_count += 1
                 self.cadenceFeedbackLabel.setText(f"On pace")
+                self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
                 self.sendLightCommand()
             else:
                 if self.current_cadence < self.current_bpm:
+                    self.faster_count += 1
                     self.cadenceFeedbackLabel.setText(f"Faster")
+                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Faster")
                     print("Sent 'Faster' command")
                 elif self.current_cadence > self.current_bpm:
+                    self.slower_count += 1
                     self.cadenceFeedbackLabel.setText(f"Slower")
+                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Slower")
                     print("Sent 'Slower' command")
 
@@ -710,6 +728,7 @@ class MainWindow(QMainWindow):
         self.timerControlLabel.setText(f"{self.timerDuration} s")
 
     def startTimer(self):
+        self.resetCounters()
         self.timeRemaining = self.timerDuration
         self.updateTimerLabel()
         self.timer.start(1000)
