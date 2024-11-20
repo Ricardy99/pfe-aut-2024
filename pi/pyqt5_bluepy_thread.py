@@ -157,6 +157,7 @@ class MainWindow(QMainWindow):
         self.settingsPageWidget1 = QWidget()
         self.settingsPageWidget2 = QWidget()
         self.workoutPageWidget = QWidget()
+        self.feedbackPageWidget = QWidget()
 
         ##########################################################################################################
         #                                       Menu page layout                                                 #
@@ -329,7 +330,7 @@ class MainWindow(QMainWindow):
         settingsPageTitle2.setStyleSheet("font-size: 15px;")
         settingsPageTitle2.setFixedHeight(15)
 
-        # Add button to first settings page
+        # Add button to menu page
         settingsPageButton1 = QPushButton("Back")
         settingsPageButton1.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
 
@@ -479,7 +480,7 @@ class MainWindow(QMainWindow):
 
         # Add button to the menu page
         menuPageButton_2 = QPushButton("End workout")
-        menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
+        menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.feedbackPageWidget))
         menuPageButton_2.clicked.connect(self.stopTimer)
 
         # Add widgets to layout
@@ -492,12 +493,55 @@ class MainWindow(QMainWindow):
         self.workoutPageWidget.setLayout(workoutPageLayout)
         ##########################################################################################################
 
+        ##########################################################################################################
+        #                                     Feedback page layout                                               #
+        ##########################################################################################################
+        feedbackPageLayout = QVBoxLayout()
+
+        # Add page title
+        feedbackPageTitle = QLabel("Feedback")
+        feedbackPageTitle.setAlignment(Qt.AlignCenter)
+        feedbackPageTitle.setStyleSheet("font-size: 15px;")
+        feedbackPageTitle.setFixedHeight(15)
+
+        # Add button to menu page
+        feedback_to_MenuPageButton = QPushButton("Menu")
+        feedback_to_MenuPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.menuPageWidget))
+
+        # Add a steps feedback group
+        stepsFeedbackGroupBox = QGroupBox("Steps feedback")
+
+        self.onPaceCountLabel_2 = QLabel("You took 0 steps on pace")
+        self.fasterCountLabel_2 = QLabel("You took 0 steps too slow")
+        self.slowerCountLabel_2 = QLabel("You took 0 steps too fast")
+
+        #stepsFeedbackDisplayLayout = QHBoxLayout()
+        #stepsFeedbackDisplayLayout.addWidget(self.fasterCountLabel_2)
+        #stepsFeedbackDisplayLayout.addWidget(self.onPaceCountLabel_2)
+        #stepsFeedbackDisplayLayout.addWidget(self.slowerCountLabel_2)
+
+        stepsFeedbackLayout = QVBoxLayout()
+        #stepsFeedbackLayout.addLayout(stepsFeedbackDisplayLayout)
+        stepsFeedbackLayout.addWidget(self.fasterCountLabel_2)
+        stepsFeedbackLayout.addWidget(self.onPaceCountLabel_2)
+        stepsFeedbackLayout.addWidget(self.slowerCountLabel_2)
+        stepsFeedbackGroupBox.setLayout(stepsFeedbackLayout)
+        
+
+        # Add widgets to layout
+        feedbackPageLayout.addWidget(feedbackPageTitle)
+        feedbackPageLayout.addWidget(stepsFeedbackGroupBox)
+        feedbackPageLayout.addWidget(feedback_to_MenuPageButton)
+
+        self.feedbackPageWidget.setLayout(feedbackPageLayout)
+        ##########################################################################################################
 
         # Add widget to the stacked widget
         self.stackedWidget.addWidget(self.menuPageWidget)
         self.stackedWidget.addWidget(self.settingsPageWidget1)
         self.stackedWidget.addWidget(self.settingsPageWidget2)
         self.stackedWidget.addWidget(self.workoutPageWidget)
+        self.stackedWidget.addWidget(self.feedbackPageWidget)
 
         # Show menu page by default
         self.stackedWidget.setCurrentWidget(self.menuPageWidget)
@@ -650,6 +694,11 @@ class MainWindow(QMainWindow):
                     self.workerBLE.toSendBLE("Slower")
                     print("Sent 'Slower' command")
 
+    def updateStepsFeedbackLabel(self):
+        self.slowerCountLabel_2.setText(f"You took {self.slower_count} steps too fast")
+        self.onPaceCountLabel_2.setText(f"You took {self.onPace_count} steps on pace")
+        self.fasterCountLabel_2.setText(f"You took {self.faster_count} steps too slow")
+
     def slotMsg(self, msg):
         print(msg)
 
@@ -750,6 +799,7 @@ class MainWindow(QMainWindow):
         self.timer.start(1000)
 
     def stopTimer(self):
+        self.updateStepsFeedbackLabel()
         self.timer.stop()
 
     def updateTimer(self):
@@ -759,6 +809,8 @@ class MainWindow(QMainWindow):
         else:
             self.timer.stop()
             self.timerLabel.setText("Time's up!")
+            self.updateStepsFeedbackLabel()
+            self.stackedWidget.setCurrentWidget(self.feedbackPageWidget)
 
     def updateTimerLabel(self):
         #minutes, seconds = divmod(self.time_remaining, 60)
