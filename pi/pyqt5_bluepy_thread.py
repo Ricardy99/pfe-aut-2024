@@ -257,9 +257,14 @@ class MainWindow(QMainWindow):
         self.upperBoundOffsetSlider.valueChanged.connect(self.updateUBO)
 
         bpmLayout = QVBoxLayout()
-        bpmLayout.addWidget(self.lowerBoundLabel)
-        bpmLayout.addWidget(self.bpmLabel)
-        bpmLayout.addWidget(self.upperBoundLabel)
+        #bpmLayout.addWidget(self.lowerBoundLabel)
+        #bpmLayout.addWidget(self.bpmLabel)
+        #bpmLayout.addWidget(self.upperBoundLabel)
+
+        bpmDisplayLayout = QHBoxLayout()
+        bpmDisplayLayout.addWidget(self.lowerBoundLabel)
+        bpmDisplayLayout.addWidget(self.bpmLabel)
+        bpmDisplayLayout.addWidget(self.upperBoundLabel)
 
         bpmControlsLayout = QHBoxLayout()
         bpmControlsLayout.addWidget(self.tapButton)
@@ -273,6 +278,7 @@ class MainWindow(QMainWindow):
         upperBoundOffsetLayout.addWidget(self.upperBoundOffsetLabel)
         upperBoundOffsetLayout.addWidget(self.upperBoundOffsetSlider)
 
+        bpmLayout.addLayout(bpmDisplayLayout)
         bpmLayout.addLayout(bpmControlsLayout)
         bpmLayout.addLayout(lowerBoundOffsetLayout)
         bpmLayout.addLayout(upperBoundOffsetLayout)
@@ -418,17 +424,22 @@ class MainWindow(QMainWindow):
         workoutPageTitle.setFixedHeight(15)
 
         # Add timer
+        timerGroupBox = QGroupBox("Timer")
         self.timer.timeout.connect(self.updateTimer)
         self.timeRemaining = self.timerDuration
 
         self.timerLabel = QLabel(f"timer: {self.timeRemaining} s")
+
+        timerLayout = QVBoxLayout()
+        timerLayout.addWidget(self.timerLabel)
+        timerGroupBox.setLayout(timerLayout)
 
         # New Group Box for Cadence Controls
         cadenceGroupBox = QGroupBox("Cadence")
 
         self.cadenceLabel = QLabel("Cadence: 0 BPM")
 
-        self.cadenceFeedbackLabel = QLabel("")
+        self.cadenceFeedbackLabel = QLabel("On pace")
         self.cadenceFeedbackLabel.setAlignment(Qt.AlignCenter)
 
         cadenceLayout = QVBoxLayout()
@@ -460,7 +471,7 @@ class MainWindow(QMainWindow):
 
         # Add widgets to layout
         workoutPageLayout.addWidget(workoutPageTitle)
-        workoutPageLayout.addWidget(self.timerLabel)
+        workoutPageLayout.addWidget(timerGroupBox)
         workoutPageLayout.addWidget(cadenceGroupBox)
         workoutPageLayout.addWidget(analogGroupBox)
         workoutPageLayout.addWidget(menuPageButton_2)
