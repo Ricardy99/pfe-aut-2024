@@ -525,11 +525,14 @@ class MainWindow(QMainWindow):
         self.slower_count = 0
         self.fasterCount_allowed = 0
         self.slowerCount_allowed = 0
-
+        
     def resetCounters(self):
         self.onPace_count = 0
         self.faster_count = 0
         self.slower_count = 0
+        self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
+        self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
+        self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
