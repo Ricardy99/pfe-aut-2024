@@ -450,6 +450,15 @@ class MainWindow(QMainWindow):
         self.fasterCountLabel = QLabel("Faster count: 0")
         self.slowerCountLabel = QLabel("Slower count: 0")
 
+        self.consecutiveOnPaceCountLabel = QLabel("Consecutive on pace count: 0")
+        self.consecutiveFasterCountLabel = QLabel("Consecutive faster count: 0")
+        self.consecutiveSlowerCountLabel = QLabel("Consecutive slower count: 0")
+
+        consecutiveCountLayout = QHBoxLayout()
+        consecutiveCountLayout.addWidget(self.consecutiveSlowerCountLabel)
+        consecutiveCountLayout.addWidget(self.consecutiveOnPaceCountLabel)
+        consecutiveCountLayout.addWidget(self.consecutiveFasterCountLabel)
+
         cadenceLayout = QVBoxLayout()
         cadenceDisplayLayout = QHBoxLayout()
         cadenceDisplayLayout.addWidget(self.cadenceLabel)
@@ -458,6 +467,7 @@ class MainWindow(QMainWindow):
         cadenceDisplayLayout.addWidget(self.fasterCountLabel)
         #cadenceLayout.addWidget(self.cadenceLabel)
         cadenceLayout.addLayout(cadenceDisplayLayout)
+        cadenceLayout.addLayout(consecutiveCountLayout)
         cadenceLayout.addWidget(self.cadenceFeedbackLabel)
         cadenceGroupBox.setLayout(cadenceLayout)
 
@@ -567,6 +577,9 @@ class MainWindow(QMainWindow):
         self.onPace_count = 0
         self.faster_count = 0
         self.slower_count = 0
+        self.consecutiveFaster_count = 0
+        self.consecutiveSlower_count = 0
+        self.consecutiveOnPace_count = 0
         self.fasterCount_allowed = 0
         self.slowerCount_allowed = 0
         
@@ -574,9 +587,15 @@ class MainWindow(QMainWindow):
         self.onPace_count = 0
         self.faster_count = 0
         self.slower_count = 0
+        self.consecutiveOnPace_count = 0
+        self.consecutiveFaster_count = 0
+        self.consecutiveSlower_count = 0
         self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
         self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
         self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
+        self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
+        self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
+        self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
@@ -667,12 +686,18 @@ class MainWindow(QMainWindow):
 
     def checkAndSendLightCommand(self):
         if self.current_bpm > 0 and self.current_cadence > 0:
+            self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
+            self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
+            self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
             if self.current_lbo > self.current_bpm:
                 self.lower_bound = 0
             else:
                 self.lower_bound = self.current_bpm - self.current_lbo   #0.9
             self.upper_bound = self.current_bpm + self.current_ubo   #1.1
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
+                self.consecutiveFaster_count = 0
+                self.consecutiveOnPace_count += 1
+                self.consecutiveSlower_count = 0
                 self.onPace_count += 1
                 self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
                 self.cadenceFeedbackLabel.setText(f"On pace")
@@ -680,6 +705,9 @@ class MainWindow(QMainWindow):
                 self.sendLightCommand()
             else:
                 if self.current_cadence < self.current_bpm:
+                    self.consecutiveFaster_count += 1
+                    self.consecutiveOnPace_count = 0
+                    self.consecutiveSlower_count = 0
                     self.faster_count += 1
                     self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
                     self.cadenceFeedbackLabel.setText(f"Faster")
@@ -687,6 +715,9 @@ class MainWindow(QMainWindow):
                     self.workerBLE.toSendBLE("Faster")
                     print("Sent 'Faster' command")
                 elif self.current_cadence > self.current_bpm:
+                    self.consecutiveFaster_count = 0
+                    self.consecutiveOnPace_count = 0
+                    self.consecutiveSlower_count += 1
                     self.slower_count += 1
                     self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
                     self.cadenceFeedbackLabel.setText(f"Slower")
