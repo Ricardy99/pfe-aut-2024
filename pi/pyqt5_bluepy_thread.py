@@ -6,11 +6,11 @@ from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import ( 
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy, QStackedWidget, QSpacerItem
 )
-#from bluepy import btle
+from bluepy import btle
 import time
 import datetime
 
-"""
+#"""
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
         self.timestamp = timestamp
@@ -143,7 +143,7 @@ class WorkerBLE(QRunnable):
         self.bytestosend = bytes(tosend, 'utf-8')
         self.rqsToSend = True
         
-"""    
+#"""    
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -594,8 +594,8 @@ class MainWindow(QMainWindow):
         self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
         self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
         self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
-        self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
-        self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
+        self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
+        self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
 
     def updateCounters(self, sensor_key):
         now = datetime.datetime.now()
@@ -603,13 +603,13 @@ class MainWindow(QMainWindow):
         timestamps = [
         self.sensor_exceed_timestamps[f"AnP3{i}"][-1]
         for i in range(4, 10)
-        if self.sensor_exceed_timestamps[f"AnP3{i}"]]
-        timestamps[sensor_key].pop()
+        if f"AnP3{i}" != sensor_key and self.sensor_exceed_timestamps[f"AnP3{i}"]]
+        #timestamps[sensor_key].pop()
         # if all timestamps element happened at least 1 seconds ago
-        if all(i + datetime.timedelta(seconds=1) < now for i in timestamps):
+        if all(i + datetime.timedelta(milliseconds=500) < now for i in timestamps):
             self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
-            self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
-            self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
+            self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
+            self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
                     self.consecutiveFaster_count = 0
                     self.consecutiveOnPace_count += 1
