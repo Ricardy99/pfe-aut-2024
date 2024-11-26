@@ -250,12 +250,18 @@ class MainWindow(QMainWindow):
         self.upperBoundOffsetSlider.setRange(0, 20)
         self.upperBoundOffsetSlider.setValue(0)
 
+        self.offBeatStepsLabel = QLabel("Number of off beat steps allowed: 0")
+        self.offBeatStepsSlider = QSlider(Qt.Horizontal)
+        self.offBeatStepsSlider.setRange(0, 50)
+        self.offBeatStepsSlider.setValue(0)
+
         self.tapButton = QPushButton("Tap")
         self.tapButton.pressed.connect(self.tapBPM)
 
         self.bpmSlider.valueChanged.connect(self.updateBPM)
         self.lowerBoundOffsetSlider.valueChanged.connect(self.updateLBO)
         self.upperBoundOffsetSlider.valueChanged.connect(self.updateUBO)
+        self.offBeatStepsSlider.valueChanged.connect(self.updateOffBeatSteps)
 
         bpmLayout = QVBoxLayout()
         #bpmLayout.addWidget(self.lowerBoundLabel)
@@ -280,10 +286,15 @@ class MainWindow(QMainWindow):
         upperBoundOffsetLayout.addWidget(self.upperBoundOffsetLabel)
         upperBoundOffsetLayout.addWidget(self.upperBoundOffsetSlider)
 
+        OffbeatStepsLayout = QHBoxLayout()
+        OffbeatStepsLayout.addWidget(self.offBeatStepsLabel)
+        OffbeatStepsLayout.addWidget(self.offBeatStepsSlider)
+
         bpmLayout.addLayout(bpmDisplayLayout)
         bpmLayout.addLayout(bpmControlsLayout)
         bpmLayout.addLayout(lowerBoundOffsetLayout)
         bpmLayout.addLayout(upperBoundOffsetLayout)
+        bpmLayout.addLayout(OffbeatStepsLayout)
         bpmGroupBox.setLayout(bpmLayout)
 
         # Add button to the menu page
@@ -580,8 +591,8 @@ class MainWindow(QMainWindow):
         self.consecutiveFaster_count = 0
         self.consecutiveSlower_count = 0
         self.consecutiveOnPace_count = 0
-        self.fasterCount_allowed = 0
-        self.slowerCount_allowed = 0
+        self.consecutiveSloweOrFaster_count = 0
+        self.consecutiveOffBeatCount_allowed = 0
         
     def resetCounters(self):
         self.onPace_count = 0
@@ -590,6 +601,7 @@ class MainWindow(QMainWindow):
         self.consecutiveOnPace_count = 0
         self.consecutiveFaster_count = 0
         self.consecutiveSlower_count = 0
+        self.consecutiveSloweOrFaster_count = 0
         self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
         self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
         self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
@@ -614,6 +626,7 @@ class MainWindow(QMainWindow):
                     self.consecutiveFaster_count = 0
                     self.consecutiveOnPace_count += 1
                     self.consecutiveSlower_count = 0
+                    self.consecutiveSloweOrFaster_count = 0
                     self.onPace_count += 1
                     self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
                     self.cadenceFeedbackLabel.setText(f"On pace")
@@ -623,6 +636,7 @@ class MainWindow(QMainWindow):
                     self.consecutiveFaster_count += 1
                     self.consecutiveOnPace_count = 0
                     self.consecutiveSlower_count = 0
+                    self.consecutiveSloweOrFaster_count += 1
                     self.faster_count += 1
                     self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
                     self.cadenceFeedbackLabel.setText(f"Faster")
@@ -631,14 +645,21 @@ class MainWindow(QMainWindow):
                     self.consecutiveFaster_count = 0
                     self.consecutiveOnPace_count = 0
                     self.consecutiveSlower_count += 1
+                    self.consecutiveSloweOrFaster_count += 1
                     self.slower_count += 1
                     self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
                     self.cadenceFeedbackLabel.setText(f"Slower")
                     self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
+        if self.consecutiveSloweOrFaster_count == self.consecutiveOffBeatCount_allowed and self.consecutiveOffBeatCount_allowed:
+            self.endWorkout()
                     
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
+
+    def updateOffBeatSteps(self, value):
+        self.offBeatStepsLabel.setText(f"Number of off beat steps allowed: {value}")
+        self.consecutiveOffBeatCount_allowed = value
 
     def updateBPM(self, value):
         self.bpmLabel.setText(f"BPM: {value}")
@@ -898,6 +919,10 @@ class MainWindow(QMainWindow):
     def updateTimerLabel(self):
         #minutes, seconds = divmod(self.time_remaining, 60)
         self.timerLabel.setText(f"timer: {self.timeRemaining} s")
+
+    def endWorkout(self):
+        self.stopTimer()
+        self.stackedWidget.setCurrentWidget(self.feedbackPageWidget)
 
     def resetApp(self):
         # Method to reset the app
