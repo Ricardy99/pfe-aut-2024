@@ -250,12 +250,18 @@ class MainWindow(QMainWindow):
         self.upperBoundOffsetSlider.setRange(0, 20)
         self.upperBoundOffsetSlider.setValue(0)
 
+        self.offBeatStepsLabel = QLabel("Number of off beat steps allowed: 0")
+        self.offBeatStepsSlider = QSlider(Qt.Horizontal)
+        self.offBeatStepsSlider.setRange(0, 50)
+        self.offBeatStepsSlider.setValue(0)
+
         self.tapButton = QPushButton("Tap")
         self.tapButton.pressed.connect(self.tapBPM)
 
         self.bpmSlider.valueChanged.connect(self.updateBPM)
         self.lowerBoundOffsetSlider.valueChanged.connect(self.updateLBO)
         self.upperBoundOffsetSlider.valueChanged.connect(self.updateUBO)
+        self.offBeatStepsSlider.valueChanged.connect(self.updateOffBeatSteps)
 
         bpmLayout = QVBoxLayout()
         #bpmLayout.addWidget(self.lowerBoundLabel)
@@ -280,10 +286,15 @@ class MainWindow(QMainWindow):
         upperBoundOffsetLayout.addWidget(self.upperBoundOffsetLabel)
         upperBoundOffsetLayout.addWidget(self.upperBoundOffsetSlider)
 
+        OffbeatStepsLayout = QHBoxLayout()
+        OffbeatStepsLayout.addWidget(self.offBeatStepsLabel)
+        OffbeatStepsLayout.addWidget(self.offBeatStepsSlider)
+
         bpmLayout.addLayout(bpmDisplayLayout)
         bpmLayout.addLayout(bpmControlsLayout)
         bpmLayout.addLayout(lowerBoundOffsetLayout)
         bpmLayout.addLayout(upperBoundOffsetLayout)
+        bpmLayout.addLayout(OffbeatStepsLayout)
         bpmGroupBox.setLayout(bpmLayout)
 
         # Add button to the menu page
@@ -580,8 +591,8 @@ class MainWindow(QMainWindow):
         self.consecutiveFaster_count = 0
         self.consecutiveSlower_count = 0
         self.consecutiveOnPace_count = 0
-        self.fasterCount_allowed = 0
-        self.slowerCount_allowed = 0
+        self.consecutiveSloweOrFaster_count = 0
+        self.consecutiveOffBeatCount_allowed = 0
         
     def resetCounters(self):
         self.onPace_count = 0
@@ -590,15 +601,65 @@ class MainWindow(QMainWindow):
         self.consecutiveOnPace_count = 0
         self.consecutiveFaster_count = 0
         self.consecutiveSlower_count = 0
+        self.consecutiveSloweOrFaster_count = 0
         self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
         self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
         self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
         self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
-        self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
-        self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
+        self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
+        self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
+
+    def updateCounters(self, sensor_key):
+        now = datetime.datetime.now()
+        #create a list of the last timestamps for each sensor
+        timestamps = [
+        self.sensor_exceed_timestamps[f"AnP3{i}"][-1]
+        for i in range(4, 10)
+        if f"AnP3{i}" != sensor_key and self.sensor_exceed_timestamps[f"AnP3{i}"]]
+        #timestamps[sensor_key].pop()
+        # if all timestamps element happened at least 1 seconds ago
+        if all(i + datetime.timedelta(milliseconds=500) < now for i in timestamps):
+            self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
+            self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
+            self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
+            if self.lower_bound <= self.current_cadence <= self.upper_bound:
+                    self.consecutiveFaster_count = 0
+                    self.consecutiveOnPace_count += 1
+                    self.consecutiveSlower_count = 0
+                    self.consecutiveSloweOrFaster_count = 0
+                    self.onPace_count += 1
+                    self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
+                    self.cadenceFeedbackLabel.setText(f"On pace")
+                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
+            else:
+                if self.current_cadence < self.current_bpm:
+                    self.consecutiveFaster_count += 1
+                    self.consecutiveOnPace_count = 0
+                    self.consecutiveSlower_count = 0
+                    self.consecutiveSloweOrFaster_count += 1
+                    self.faster_count += 1
+                    self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
+                    self.cadenceFeedbackLabel.setText(f"Faster")
+                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
+                elif self.current_cadence > self.current_bpm:
+                    self.consecutiveFaster_count = 0
+                    self.consecutiveOnPace_count = 0
+                    self.consecutiveSlower_count += 1
+                    self.consecutiveSloweOrFaster_count += 1
+                    self.slower_count += 1
+                    self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
+                    self.cadenceFeedbackLabel.setText(f"Slower")
+                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
+        if self.consecutiveSloweOrFaster_count == self.consecutiveOffBeatCount_allowed and self.consecutiveOffBeatCount_allowed:
+            self.endWorkout()
+                    
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
+
+    def updateOffBeatSteps(self, value):
+        self.offBeatStepsLabel.setText(f"Number of off beat steps allowed: {value}")
+        self.consecutiveOffBeatCount_allowed = value
 
     def updateBPM(self, value):
         self.bpmLabel.setText(f"BPM: {value}")
@@ -685,43 +746,54 @@ class MainWindow(QMainWindow):
         print("Light command sent")
 
     def checkAndSendLightCommand(self):
+        """
+        now = datetime.datetime.now()
+        #create a list of the last timestamps for each sensor
+        timestamps = [
+        self.sensor_exceed_timestamps[f"AnP3{i}"][-1]
+        for i in range(4, 10)
+        if self.sensor_exceed_timestamps[f"AnP3{i}"]]
+
+        # if all timestamps element happened at least 1 seconds ago
+        if all(i + datetime.timedelta(seconds=1) < now for i in timestamps):
+        """
         if self.current_bpm > 0 and self.current_cadence > 0:
-            self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
-            self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
-            self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
+            #self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
+            #self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
+            #self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
             if self.current_lbo > self.current_bpm:
                 self.lower_bound = 0
             else:
                 self.lower_bound = self.current_bpm - self.current_lbo   #0.9
             self.upper_bound = self.current_bpm + self.current_ubo   #1.1
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
-                self.consecutiveFaster_count = 0
-                self.consecutiveOnPace_count += 1
-                self.consecutiveSlower_count = 0
-                self.onPace_count += 1
-                self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
-                self.cadenceFeedbackLabel.setText(f"On pace")
-                self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
+                #self.consecutiveFaster_count = 0
+                #self.consecutiveOnPace_count += 1
+                #self.consecutiveSlower_count = 0
+                #self.onPace_count += 1
+                #self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
+                #self.cadenceFeedbackLabel.setText(f"On pace")
+                #self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
                 self.sendLightCommand()
             else:
                 if self.current_cadence < self.current_bpm:
-                    self.consecutiveFaster_count += 1
-                    self.consecutiveOnPace_count = 0
-                    self.consecutiveSlower_count = 0
-                    self.faster_count += 1
-                    self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
-                    self.cadenceFeedbackLabel.setText(f"Faster")
-                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
+                    #self.consecutiveFaster_count += 1
+                    #self.consecutiveOnPace_count = 0
+                    #self.consecutiveSlower_count = 0
+                    #self.faster_count += 1
+                    #self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
+                    #self.cadenceFeedbackLabel.setText(f"Faster")
+                    #self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Faster")
                     print("Sent 'Faster' command")
                 elif self.current_cadence > self.current_bpm:
-                    self.consecutiveFaster_count = 0
-                    self.consecutiveOnPace_count = 0
-                    self.consecutiveSlower_count += 1
-                    self.slower_count += 1
-                    self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
-                    self.cadenceFeedbackLabel.setText(f"Slower")
-                    self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
+                    #self.consecutiveFaster_count = 0
+                    #self.consecutiveOnPace_count = 0
+                    #self.consecutiveSlower_count += 1
+                    #self.slower_count += 1
+                    #self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
+                    #self.cadenceFeedbackLabel.setText(f"Slower")
+                    #self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Slower")
                     print("Sent 'Slower' command")
 
@@ -796,6 +868,7 @@ class MainWindow(QMainWindow):
 
             # Update cadence label with the calculated BPM
             self.updateCadence(bpm)
+            self.updateCounters(sensor_key)
 
     def updateCadence(self, bpm):
         self.cadenceLabel.setText(f"Cadence: {bpm} BPM")
@@ -846,6 +919,10 @@ class MainWindow(QMainWindow):
     def updateTimerLabel(self):
         #minutes, seconds = divmod(self.time_remaining, 60)
         self.timerLabel.setText(f"timer: {self.timeRemaining} s")
+
+    def endWorkout(self):
+        self.stopTimer()
+        self.stackedWidget.setCurrentWidget(self.feedbackPageWidget)
 
     def resetApp(self):
         # Method to reset the app
