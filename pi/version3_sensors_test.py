@@ -1,11 +1,22 @@
+"""
+Version 3. J'ai rajoute: close button a cote du reset button, on a aussi
+ un graph des pieds qui prend les valeurs des sensors FSR but I'm not sure
+ it works yet avec bouton test pour generer valeurs random 
+ (vu que je n'ai pas le ESP relie au FSR avec moi)
+"""
+
 import sys
 import re
+import random
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess
 from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import (
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy
 )
 from bluepy import btle
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.patches as patches
 import time
 import datetime
 
@@ -36,6 +47,78 @@ class SensorData:
 
     def is_complete(self):
         return all(sensor is not None for sensor in [self.anp35, self.anp39, self.anp37, self.anp36, self.anp34, self.anp38])
+
+# Class for foot graph
+class MatplotlibCanvas(FigureCanvas):
+    def __init__(self):
+        self.figure = Figure()
+        super().__init__(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        self.create_plot()
+
+    def create_plot(self):
+        # Initial plot setup
+        self.ax.clear()
+        outer_width = 20
+        outer_height = 10
+
+        # Outer rectangle
+        outer_rectangle = patches.Rectangle((0, 0), outer_width, outer_height, linewidth=2, edgecolor='black', facecolor='white')
+        self.ax.add_patch(outer_rectangle)
+
+        self.ax.set_aspect('equal')
+        self.ax.set_xlim(-1, outer_width + 1)
+        self.ax.set_ylim(-1, outer_height + 1)
+        self.ax.axis('off')
+
+    def update_plot(self, sensor_data):
+        # Clear previous rectangles
+        self.ax.clear()
+        self.create_plot()
+
+        # Threshold for sensitivity
+        THRESHOLD = 200
+
+        # Extract sensor values
+        anp_values = {
+            "anp35": sensor_data.anp35,
+            "anp39": sensor_data.anp39,
+            "anp37": sensor_data.anp37,
+            "anp36": sensor_data.anp36,
+            "anp34": sensor_data.anp34,
+            "anp38": sensor_data.anp38
+        }
+
+        # Determine active/inactive states
+        pied = [1 if value and value > THRESHOLD else 0 for value in anp_values.values()]
+
+        # Add rectangles dynamically based on sensor data
+        def add_rectangle(init_x, init_y, width, height, color):
+            rectangle = patches.Rectangle((init_x, init_y), width, height, facecolor=color)
+            self.ax.add_patch(rectangle)
+
+        def create_6_rectangles(init_x, init_y, values):
+            init_heights = [
+                init_y,
+                init_y + 1.5 / 2,
+                init_y + 1.5 / 2 + 1.5,
+                init_y + 1.5 / 2 + 2 * 1.5,
+                init_y + 1.5 / 2 + 3 * 1.5,
+                init_y + 1.5 / 2 + 4 * 1.5,
+            ]
+            color = 'g' if sum(values) > 3 else 'r'
+            for i, value in enumerate(values):
+                if value == 1:
+                    height = 1.5 / 2 if i in [0, 5] else 1.5
+                    add_rectangle(init_x, init_heights[i], 3, height, color)
+
+        # Update the foot visualization
+        create_6_rectangles(3, 1.5, pied)
+        create_6_rectangles(14.5, 1.5, pied)
+
+        # Refresh the canvas
+        self.draw()
+
 
 class WorkerSignals(QObject):
     signalMsg = pyqtSignal(str)
@@ -148,10 +231,18 @@ class MainWindow(QMainWindow):
         # Add Reset Button at the top of the screen
         self.buttonResetApp = QPushButton("Reset App")
         self.buttonResetApp.pressed.connect(self.resetApp)
+        
+        # Add Close Button at the top of the screen
+        self.buttonCloseApp = QPushButton("Close App")
+        self.buttonCloseApp.pressed.connect(self.CloseApp)
 
         # Add Start BLE Button
         self.buttonStartBLE = QPushButton("Start BLE")
         self.buttonStartBLE.pressed.connect(self.startBLE)
+        
+        # Add test button for manual sensor input
+        self.buttonTestSensors = QPushButton("Set Test Sensor Values")
+        self.buttonTestSensors.pressed.connect(self.setTestSensorValues)
 
         # Connecting text label setup
         self.connectingLabel = QLabel("Trying to connect to Bluetooth...", self)
@@ -172,6 +263,18 @@ class MainWindow(QMainWindow):
         weightLayout.addWidget(self.weightLabel)
         weightGroupBox.setLayout(weightLayout)
 
+        # # # Group Box for Analog Values Table
+        # # analogGroupBox = QGroupBox("Analog Values")
+
+        # # self.timestampLabel = QLabel("Timestamp: N/A")
+        # # self.analogTable = QTableWidget(6, 1)  # 6 rows, 1 column
+        # # # Remove header labels
+        # # self.analogTable.horizontalHeader().setVisible(False)
+        # # self.analogTable.verticalHeader().setVisible(False)
+        # # self.analogTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # # self.analogTable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+# # #        self.analogTable.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
         # Group Box for Analog Values Table
         analogGroupBox = QGroupBox("Analog Values")
 
@@ -182,12 +285,50 @@ class MainWindow(QMainWindow):
         self.analogTable.verticalHeader().setVisible(False)
         self.analogTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.analogTable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-#        self.analogTable.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        
+
         analogLayout = QVBoxLayout()
         analogLayout.addWidget(self.timestampLabel)
         analogLayout.addWidget(self.analogTable)
         analogGroupBox.setLayout(analogLayout)
+
+        # Group Box for Foot Plot
+        plotGroupBox = QGroupBox("Foot Visualization")
+        plotLayout = QVBoxLayout()
+        self.footPlot = MatplotlibCanvas()
+
+        # Set a minimum size for the canvas
+        self.footPlot.setMinimumSize(200, 100)
+
+        plotLayout.addWidget(self.footPlot)
+        plotGroupBox.setLayout(plotLayout)
+
+        # Combine both sections in a horizontal layout
+        sideBySideLayout = QHBoxLayout()
+        sideBySideLayout.addWidget(analogGroupBox)  # Add Analog Values Group Box
+        sideBySideLayout.addWidget(plotGroupBox)    # Add Foot Visualization Group Box
+
+        # Add the horizontal layout to the main layout
+        mainLayout.addLayout(sideBySideLayout)
+
+        
+        # # analogLayout = QVBoxLayout()
+        # # analogLayout.addWidget(self.timestampLabel)
+        # # analogLayout.addWidget(self.analogTable)
+        # # analogGroupBox.setLayout(analogLayout)
+        
+        # # # Add Group Box for Foot Plot
+        # # plotGroupBox = QGroupBox("Foot Visualization")
+        # # plotLayout = QVBoxLayout()
+        # # self.footPlot = MatplotlibCanvas()
+        
+        # # # Set a minimum size for the canvas
+        # # self.footPlot.setMinimumSize(200, 100)
+
+        # # plotLayout.addWidget(self.footPlot)
+        # # plotGroupBox.setLayout(plotLayout)
+        
+        # Optional, remove if problematic
+        #plotGroupBox.setMinimumHeight(250)
 
         # Group Box for Tare Controls
         tareGroupBox = QGroupBox("Tare")
@@ -275,24 +416,35 @@ class MainWindow(QMainWindow):
         fsrGroupBox.setLayout(fsrLayout)
 
         # Adding widgets to the main layout
-        mainLayout.addWidget(self.buttonResetApp)  # Add Reset Button to the top
+        # # mainLayout.addWidget(self.buttonResetApp)  # Add Reset Button to the top
+        # # mainLayout.addWidget(self.buttonCloseApp)  # Add Close Button to the top
+        buttonLayout = QHBoxLayout()            #Create horizontal layout, Reset will be next to Close button
+        buttonLayout.addWidget(self.buttonResetApp)  # Add Reset Button first
+        buttonLayout.addWidget(self.buttonCloseApp)  # Add Close Button
+        mainLayout.addLayout(buttonLayout)  # Add the horizontal layout to the main layout
+
+        
         mainLayout.addWidget(self.buttonStartBLE)
+        mainLayout.addWidget(self.buttonTestSensors)
         mainLayout.addWidget(batteryGroupBox)      # Add the Battery group box
         mainLayout.addWidget(bpmGroupBox)          # Add the BPM Controls group box
-        mainLayout.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
-        mainLayout.addWidget(self.connectingLabel) # Add connecting text label to the layout
+        #mainLayout.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
+        #mainLayout.addWidget(self.connectingLabel) # Add connecting text label to the layout
         mainLayout.addWidget(weightGroupBox)       # Add the weight group box here
-        mainLayout.addWidget(analogGroupBox)       # Add the analog values table group box
-        mainLayout.addWidget(tareGroupBox)
+        # # mainLayout.addWidget(analogGroupBox)       # Add the analog values table group box
+        # # mainLayout.addWidget(plotGroupBox)         # Foot Visualization
+        # # mainLayout.addWidget(tareGroupBox)
         mainLayout.addWidget(calGroupBox)
         mainLayout.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
+        
 
         widget = QWidget()
         widget.setLayout(mainLayout)
 
         self.setCentralWidget(widget)
 
-        self.showFullScreen()
+        #self.showFullScreen()
+        self.showNormal()
         self.threadpool = QThreadPool()
         print("Multithreading with Maximum %d threads" % self.threadpool.maxThreadCount())
 
@@ -307,6 +459,27 @@ class MainWindow(QMainWindow):
         self.workerBLE = None
         self.current_bpm = 0
         self.current_cadence = 0
+        
+    def setTestSensorValues(self):
+        # Create a SensorData object with test values
+        test_data = SensorData(
+            timestamp="00:00.000",
+            anp35=random.randint(0, 800),
+            anp39=random.randint(0, 800),
+            anp37=random.randint(0, 800),
+            anp36=random.randint(0, 800),
+            anp34=random.randint(0, 800),
+            anp38=random.randint(0, 800)
+        )
+        # Update the analog values table
+        self.updateAnalogValues(test_data)
+        # Update the plot with the test values
+        self.footPlot.update_plot(test_data)
+
+    def updateAnalogValues(self, data):
+        # Update sensor values in the table
+        # Update the foot visualization dynamically
+        self.footPlot.update_plot(data)
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
@@ -475,6 +648,10 @@ class MainWindow(QMainWindow):
         print("Resetting the application...")
         QProcess.startDetached(sys.executable, sys.argv)  # Restart the app
         QApplication.exit()
+    def CloseApp(self):
+        # Method to close the app
+        print("Closing the application.")
+        QApplication.exit(0)
 
 app = QApplication(sys.argv)
 window = MainWindow()
