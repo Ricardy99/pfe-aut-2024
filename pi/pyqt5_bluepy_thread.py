@@ -6,11 +6,11 @@ from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import ( 
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy, QStackedWidget, QSpacerItem
 )
-#from bluepy import btle
+from bluepy import btle
 import time
 import datetime
 
-"""
+#"""
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
         self.timestamp = timestamp
@@ -143,7 +143,7 @@ class WorkerBLE(QRunnable):
         self.bytestosend = bytes(tosend, 'utf-8')
         self.rqsToSend = True
         
-"""    
+#"""    
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -235,7 +235,7 @@ class MainWindow(QMainWindow):
         self.bpmLabel = QLabel("BPM: 0")
         self.bpmSlider = QSlider(Qt.Horizontal)
         self.bpmSlider.setRange(0, 100)
-        self.bpmSlider.setValue(30)
+        self.bpmSlider.setValue(0)
 
         self.lowerBoundLabel = QLabel("Lower limit: 0")
         self.upperBoundLabel = QLabel("Upper limit: 0")
@@ -264,15 +264,11 @@ class MainWindow(QMainWindow):
         self.offBeatStepsSlider.valueChanged.connect(self.updateOffBeatSteps)
 
         bpmLayout = QVBoxLayout()
-        #bpmLayout.addWidget(self.lowerBoundLabel)
-        #bpmLayout.addWidget(self.bpmLabel)
-        #bpmLayout.addWidget(self.upperBoundLabel)
 
         bpmDisplayLayout = QHBoxLayout()
         bpmDisplayLayout.addWidget(self.lowerBoundLabel)
         bpmDisplayLayout.addWidget(self.bpmLabel)
         bpmDisplayLayout.addWidget(self.upperBoundLabel)
-        #bpmDisplayLayout.setAlignment(Qt.AlignCenter)
 
         bpmControlsLayout = QHBoxLayout()
         bpmControlsLayout.addWidget(self.tapButton)
@@ -476,7 +472,6 @@ class MainWindow(QMainWindow):
         cadenceDisplayLayout.addWidget(self.slowerCountLabel)
         cadenceDisplayLayout.addWidget(self.onPaceCountLabel)
         cadenceDisplayLayout.addWidget(self.fasterCountLabel)
-        #cadenceLayout.addWidget(self.cadenceLabel)
         cadenceLayout.addLayout(cadenceDisplayLayout)
         cadenceLayout.addLayout(consecutiveCountLayout)
         cadenceLayout.addWidget(self.cadenceFeedbackLabel)
@@ -536,13 +531,7 @@ class MainWindow(QMainWindow):
         self.fasterCountLabel_2 = QLabel("You took 0 steps too slow")
         self.slowerCountLabel_2 = QLabel("You took 0 steps too fast")
 
-        #stepsFeedbackDisplayLayout = QHBoxLayout()
-        #stepsFeedbackDisplayLayout.addWidget(self.fasterCountLabel_2)
-        #stepsFeedbackDisplayLayout.addWidget(self.onPaceCountLabel_2)
-        #stepsFeedbackDisplayLayout.addWidget(self.slowerCountLabel_2)
-
         stepsFeedbackLayout = QVBoxLayout()
-        #stepsFeedbackLayout.addLayout(stepsFeedbackDisplayLayout)
         stepsFeedbackLayout.addWidget(self.fasterCountLabel_2)
         stepsFeedbackLayout.addWidget(self.onPaceCountLabel_2)
         stepsFeedbackLayout.addWidget(self.slowerCountLabel_2)
@@ -616,9 +605,8 @@ class MainWindow(QMainWindow):
         self.sensor_exceed_timestamps[f"AnP3{i}"][-1]
         for i in range(4, 10)
         if f"AnP3{i}" != sensor_key and self.sensor_exceed_timestamps[f"AnP3{i}"]]
-        #timestamps[sensor_key].pop()
-        # if all timestamps element happened at least 1 seconds ago
-        if all(i + datetime.timedelta(milliseconds=500) < now for i in timestamps):
+        # if all timestamps element happened at least 0.3 seconds ago
+        if all(i + datetime.timedelta(milliseconds=300) < now for i in timestamps):
             self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
             self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
             self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
@@ -746,54 +734,19 @@ class MainWindow(QMainWindow):
         print("Light command sent")
 
     def checkAndSendLightCommand(self):
-        """
-        now = datetime.datetime.now()
-        #create a list of the last timestamps for each sensor
-        timestamps = [
-        self.sensor_exceed_timestamps[f"AnP3{i}"][-1]
-        for i in range(4, 10)
-        if self.sensor_exceed_timestamps[f"AnP3{i}"]]
-
-        # if all timestamps element happened at least 1 seconds ago
-        if all(i + datetime.timedelta(seconds=1) < now for i in timestamps):
-        """
         if self.current_bpm > 0 and self.current_cadence > 0:
-            #self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
-            #self.consecutiveSlowerCountLabel.setText(f"Consecutive on pace count: {self.consecutiveSlower_count}")
-            #self.consecutiveFasterCountLabel.setText(f"Consecutive on pace count: {self.consecutiveFaster_count}")
             if self.current_lbo > self.current_bpm:
                 self.lower_bound = 0
             else:
-                self.lower_bound = self.current_bpm - self.current_lbo   #0.9
-            self.upper_bound = self.current_bpm + self.current_ubo   #1.1
+                self.lower_bound = self.current_bpm - self.current_lbo
+            self.upper_bound = self.current_bpm + self.current_ubo
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
-                #self.consecutiveFaster_count = 0
-                #self.consecutiveOnPace_count += 1
-                #self.consecutiveSlower_count = 0
-                #self.onPace_count += 1
-                #self.onPaceCountLabel.setText(f"On pace count: {self.onPace_count}")
-                #self.cadenceFeedbackLabel.setText(f"On pace")
-                #self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #1abf08;}")
                 self.sendLightCommand()
             else:
                 if self.current_cadence < self.current_bpm:
-                    #self.consecutiveFaster_count += 1
-                    #self.consecutiveOnPace_count = 0
-                    #self.consecutiveSlower_count = 0
-                    #self.faster_count += 1
-                    #self.fasterCountLabel.setText(f"Faster count: {self.faster_count}")
-                    #self.cadenceFeedbackLabel.setText(f"Faster")
-                    #self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Faster")
                     print("Sent 'Faster' command")
                 elif self.current_cadence > self.current_bpm:
-                    #self.consecutiveFaster_count = 0
-                    #self.consecutiveOnPace_count = 0
-                    #self.consecutiveSlower_count += 1
-                    #self.slower_count += 1
-                    #self.slowerCountLabel.setText(f"Slower count: {self.slower_count}")
-                    #self.cadenceFeedbackLabel.setText(f"Slower")
-                    #self.cadenceFeedbackLabel.setStyleSheet("QLabel {background-color: #d0d615;}")
                     self.workerBLE.toSendBLE("Slower")
                     print("Sent 'Slower' command")
 
@@ -903,7 +856,6 @@ class MainWindow(QMainWindow):
         self.timer.start(1000)
 
     def stopTimer(self):
-        self.updateStepsFeedbackLabel()
         self.timer.stop()
 
     def updateTimer(self):
@@ -911,10 +863,8 @@ class MainWindow(QMainWindow):
             self.timeRemaining -= 1
             self.updateTimerLabel()
         else:
-            self.timer.stop()
-            self.timerLabel.setText("Time's up!")
-            self.updateStepsFeedbackLabel()
-            self.stackedWidget.setCurrentWidget(self.feedbackPageWidget)
+            self.endWorkout()
+            
 
     def updateTimerLabel(self):
         #minutes, seconds = divmod(self.time_remaining, 60)
@@ -922,6 +872,7 @@ class MainWindow(QMainWindow):
 
     def endWorkout(self):
         self.stopTimer()
+        self.updateStepsFeedbackLabel()
         self.stackedWidget.setCurrentWidget(self.feedbackPageWidget)
 
     def resetApp(self):
@@ -934,7 +885,7 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
-window.resize(1024, 600)
-window.show()
-#window.showFullScreen()
+#window.resize(1024, 600)
+#window.show()
+window.showFullScreen()
 app.exec()
