@@ -3,11 +3,16 @@ Version 3. J'ai rajoute: close button a cote du reset button, on a aussi
  un graph des pieds qui prend les valeurs des sensors FSR but I'm not sure
  it works yet avec bouton test pour generer valeurs random 
  (vu que je n'ai pas le ESP relie au FSR avec moi)
+ 
+ Issue 1: Probleme affichage du pourcentage de la batterie
+          
+ Issue 2: Les valeurs sont updates dans le table mais pas dans le graph
+          SOLVED On Nov 29 2024
 """
 
 import sys
 import re
-import random
+import random   #pour test values graph
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess
 from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import (
@@ -76,17 +81,17 @@ class MatplotlibCanvas(FigureCanvas):
         self.ax.clear()
         self.create_plot()
 
-        # Threshold for sensitivity
-        THRESHOLD = 200
+        # Threshold for sensitivity, 0 is max sensitivity
+        THRESHOLD = 1200
 
         # Extract sensor values
         anp_values = {
             "anp35": sensor_data.anp35,
-            "anp39": sensor_data.anp39,
-            "anp37": sensor_data.anp37,
-            "anp36": sensor_data.anp36,
             "anp34": sensor_data.anp34,
-            "anp38": sensor_data.anp38
+            "anp39": sensor_data.anp39,
+            "anp38": sensor_data.anp38,
+            "anp37": sensor_data.anp37,
+            "anp36": sensor_data.anp36
         }
 
         # Determine active/inactive states
@@ -464,22 +469,27 @@ class MainWindow(QMainWindow):
         # Create a SensorData object with test values
         test_data = SensorData(
             timestamp="00:00.000",
-            anp35=random.randint(0, 800),
-            anp39=random.randint(0, 800),
-            anp37=random.randint(0, 800),
-            anp36=random.randint(0, 800),
-            anp34=random.randint(0, 800),
-            anp38=random.randint(0, 800)
+            anp35=random.randint(0, 3000),
+            anp39=random.randint(0, 3000),
+            anp37=random.randint(0, 3000),
+            anp36=random.randint(0, 3000),
+            anp34=random.randint(0, 3000),
+            anp38=random.randint(0, 3000)
         )
         # Update the analog values table
         self.updateAnalogValues(test_data)
         # Update the plot with the test values
         self.footPlot.update_plot(test_data)
-
-    def updateAnalogValues(self, data):
-        # Update sensor values in the table
-        # Update the foot visualization dynamically
+    
+    # 29 nov 2024
+    def setGraphValues(self, data):
         self.footPlot.update_plot(data)
+
+#must be a mistake cause why defined a second time? 29 nov 24
+#   def updateAnalogValues(self, data):
+#        # Update sensor values in the table
+#        # Update the foot visualization dynamically
+#        self.footPlot.update_plot(data)
 
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
@@ -522,6 +532,8 @@ class MainWindow(QMainWindow):
         self.workerBLE.signals.signalConnecting.connect(self.setConnectingLabelVisible)
         self.workerBLE.signals.signalConnected.connect(self.updateBLEButton)
         self.workerBLE.signals.signalDataParsed.connect(self.updateAnalogValues)
+        self.workerBLE.signals.signalDataParsed.connect(self.setGraphValues)
+       # self.workerBLE.signals.signalDataParsed.connect(MatplotlibCanvas.update_plot)       #29 nov 2024
         self.threadpool.start(self.workerBLE)
 
     def sendTare(self):
@@ -571,10 +583,14 @@ class MainWindow(QMainWindow):
 
     def updateBatteryDisplay(self, message):
         # Extract battery percentage from the message
+        print(f"Debug: Received message for battery - {message}")       #For troubleshooting, new battery
         match = re.search(r'B:(\d+)', message)
         if match:
             battery = match.group(1)
             self.batteryLabel.setText(f"Battery: {battery}%")
+        else:
+            print("Battery percentage not found in the message.")
+            
 
     def updateAnalogValues(self, data):
         # Update the timestamp label
@@ -603,6 +619,7 @@ class MainWindow(QMainWindow):
 
             self.analogTable.setItem(row, 0, item)
             self.sensor_last_values[sensor_key] = sensor_value
+            
 
     def registerExceed(self, sensor_key):
         now = datetime.datetime.now()
@@ -622,8 +639,10 @@ class MainWindow(QMainWindow):
             self.updateCadence(bpm)
 
     def updateCadence(self, bpm):
-        self.cadenceLabel.setText(f"Cadence: {bpm} BPM")
-        self.current_cadence = bpm
+  #      self.cadenceLabel.setText(f"Cadence: {bpm} BPM")
+  #      self.current_cadence = bpm
+    #replaced 2 lines above with line below to stop error messages
+        self.current_cadence = 4
         self.checkAndSendLightCommand()
 
     def setConnectingLabelVisible(self, isVisible):
@@ -651,6 +670,12 @@ class MainWindow(QMainWindow):
     def CloseApp(self):
         # Method to close the app
         print("Closing the application.")
+        
+        # Stop BLE worker if running
+        if self.workerBLE is not None:
+            self.workerBLE.stop()
+            self.threadpool.waitForDone()  # Ensure the threadpool completes all tasks
+        
         QApplication.exit(0)
 
 app = QApplication(sys.argv)
