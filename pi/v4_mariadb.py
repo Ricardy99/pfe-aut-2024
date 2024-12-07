@@ -1,13 +1,16 @@
 """
-Version 3. J'ai rajoute: close button a cote du reset button, on a aussi
- un graph des pieds qui prend les valeurs des sensors FSR but I'm not sure
- it works yet avec bouton test pour generer valeurs random 
- (vu que je n'ai pas le ESP relie au FSR avec moi)
+Version 4. Objectifs:
+ 1. Utilisation de MariaDB (open-source dabatase) pour log les entrées 
+ des sensors analog et calculer la cadence.
+ 2. Utiliser ces données pour obtenir les infos suivantes: date de la 
+ seance, durée, vitesse moyenne, maximale et minimale.
+ 3. Afficher tout ça à l'écran.
+ 4. (optionnel) option pour effacer données?
  
  Issue 1: Probleme affichage du pourcentage de la batterie
-          
- Issue 2: Les valeurs sont updates dans le table mais pas dans le graph
-          SOLVED On Nov 29 2024
+ 
+ Update 6 dec: présentement la cadence est calculée mais non montrée sur l'application.
+ J'aimerais le montrer proche du graph de pieds.
 """
 
 import sys
@@ -25,6 +28,28 @@ from matplotlib.figure import Figure
 import matplotlib.patches as patches
 import time
 import datetime
+import mariadb
+
+#Variable THRESHOLD, pour determiner sensibilité des capteurs FSR
+THRESHOLD = 1200
+
+## Necessaire pour la connection au serveur mariadb
+# Connect to MariaDB Platform
+try:
+    conn = mariadb.connect(
+        user="webuser",
+        password="password",
+        host="127.0.0.1",
+        port=3306,
+        database="pfedb"
+    )
+except mariadb.Error as e:
+    print(f"Error connecting to MariaDB Platform: {e}")
+    sys.exit(1)
+
+# Get Cursor
+cur = conn.cursor()
+
 
 class SensorData:
     def __init__(self, timestamp=None, anp35=None, anp39=None, anp37=None, anp36=None, anp34=None, anp38=None):
@@ -82,9 +107,6 @@ class MatplotlibCanvas(FigureCanvas):
         self.ax.clear()
         self.create_plot()
 
-        # Threshold for sensitivity, 0 is max sensitivity
-        THRESHOLD = 1200
-
         # Extract sensor values
         anp_values = {
             "anp35": sensor_data.anp35,
@@ -124,6 +146,82 @@ class MatplotlibCanvas(FigureCanvas):
 
         # Refresh the canvas
         self.draw()
+        
+        
+    #Pour mettre 'a jour la base de donnees
+    def updateDB(self, sensor_data):
+        # Extract sensor values
+        anp_values = {
+            "anp35": sensor_data.anp35,
+            "anp34": sensor_data.anp34,
+            "anp39": sensor_data.anp39,
+            "anp38": sensor_data.anp38,
+            "anp37": sensor_data.anp37,
+            "anp36": sensor_data.anp36
+        }
+        # Decomposer et mettre dans un format pour envoyer au database
+        result = ",".join(str(value) for value in anp_values.values())
+         
+        valid_sensor_cnt = sum(1 for value in anp_values.values() if value > THRESHOLD)
+        
+        
+        
+        # try:
+            # cur.execute("SELECT Valid FROM SensorEntries ORDER BY Timestamp DESC LIMIT 1")
+            # last_valid_variable = cur.fetchone()  # Fetch the most recent entry
+            # last_valid_variable = last_valid_variable[0] if last_valid_variable else 0  # Default to 0 if no entry
+        # except mariadb.Error as e:
+            # print(f"Error fetching last entry: {e}")
+            # last_valid_variable = None
+            
+        # print("Last valid variable is", last_valid_variable)
+        
+        valid_entry = 0;
+        
+        # Ne comptabilisera pas si l'entree est très legere (a moins que la derniere ait ete 0)
+        if valid_sensor_cnt > 0 and valid_sensor_cnt <= 3:  #si seulement 3 bandes ou moins sont activees, invalid
+                valid_entry = 0
+        elif valid_sensor_cnt > 3: #plus de la motie des capteurs, pour que l'utilisateur ne "triche" pas
+                valid_entry = 1
+        else:
+                valid_entry = 2;    #unexpected
+        
+        try:        #insert information in db
+            cur.execute("INSERT INTO SensorEntries (Timestamp, SensorArray, Valid) VALUES (NOW(), %s, %s)", (result, valid_entry))
+               #cur.execute("INSERT INTO TrainingSessions (Name, TimeStarted, TimeEnded, HighestSpeed, LowestSpeed, AverageSpeed) VALUES (?, ?, ?, ?, ?, ?)",
+               #("Test_v4", time_started, time_ended, random.randint(50,57), random.randint(38,45), random.randint(45,50)))
+                
+        except mariadb.Error as e: 
+                print(f"Error: {e}")
+
+        conn.commit() 
+        print(f"Last Inserted ID: {cur.lastrowid}")
+        
+        # Calculate cadence/speed
+        
+        # Calculate cadence/speed
+        try:
+            # Fetch all Valid entries from the last 10 seconds
+            cur.execute("SELECT Valid FROM SensorEntries WHERE Timestamp >= NOW() - INTERVAL 10 SECOND")
+            valid_entries = [row[0] for row in cur.fetchall()]  # List of Valid values
+            #print(f"Valid entries in the last 10 seconds: {valid_entries}")
+
+            # Count only non-consecutive 1s
+            speed = 0
+            previous = None
+            for entry in valid_entries:
+                if entry == 1 and previous != 1:
+                    speed += 1
+                previous = entry
+
+            print(f"Speed (non-consecutive valid entries per 10 seconds): {speed}")
+    
+        except mariadb.Error as e:
+            print(f"Error calculating speed: {e}")
+            
+            
+            
+        
 
 
 class WorkerSignals(QObject):
@@ -483,8 +581,8 @@ class MainWindow(QMainWindow):
         self.footPlot.update_plot(test_data)
     
     # 29 nov 2024
-    def setGraphValues(self, data):
-        self.footPlot.update_plot(data)
+#    def setGraphValues(self, data):
+#        self.footPlot.update_plot(data)
 
 #must be a mistake cause why defined a second time? 29 nov 24
 #   def updateAnalogValues(self, data):
@@ -533,7 +631,8 @@ class MainWindow(QMainWindow):
         self.workerBLE.signals.signalConnecting.connect(self.setConnectingLabelVisible)
         self.workerBLE.signals.signalConnected.connect(self.updateBLEButton)
         self.workerBLE.signals.signalDataParsed.connect(self.updateAnalogValues)
-        self.workerBLE.signals.signalDataParsed.connect(self.setGraphValues)
+        self.workerBLE.signals.signalDataParsed.connect(self.footPlot.update_plot)
+        self.workerBLE.signals.signalDataParsed.connect(self.footPlot.updateDB)
        # self.workerBLE.signals.signalDataParsed.connect(MatplotlibCanvas.update_plot)       #29 nov 2024
         self.threadpool.start(self.workerBLE)
 
@@ -628,7 +727,7 @@ class MainWindow(QMainWindow):
         timestamps.append(now)
 
         # Keep only the last 5 timestamps to calculate the rhythm
-        self.sensor_exceed_timestamps[sensor_key] = timestamps[-5:]
+        self.sensor_exceed_timestamps[sensor_key] = timestamps[-50:]
 
         if len(timestamps) >= 2:
             intervals = [(timestamps[i] - timestamps[i-1]).total_seconds() for i in range(1, len(timestamps))]
@@ -666,12 +765,15 @@ class MainWindow(QMainWindow):
     def resetApp(self):
         # Method to reset the app
         print("Resetting the application...")
+        # Close mariadb Connection
+        conn.close()
         QProcess.startDetached(sys.executable, sys.argv)  # Restart the app
         QApplication.exit()
     def CloseApp(self):
         # Method to close the app
         print("Closing the application.")
-        
+        # Close mariadb Connection
+        conn.close()
         # Stop BLE worker if running
         if self.workerBLE is not None:
             self.workerBLE.stop()
