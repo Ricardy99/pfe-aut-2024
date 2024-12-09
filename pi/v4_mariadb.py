@@ -30,8 +30,14 @@ import time
 import datetime
 import mariadb
 
-#Variable THRESHOLD, pour determiner sensibilité des capteurs FSR
-THRESHOLD = 1200
+from workout_log import NewWindow, updateBPM, update_workout_data, calculate_speed_statistics
+
+#Declaration des variables globales
+THRESHOLD = 1200    #Variable THRESHOLD, pour determiner sensibilité des capteurs FSR
+calculated_BPM = 0
+sample_rate = 30    #sample of steps per X seconds
+freq = 60 / sample_rate    #to get in BPM, X * (60/freq)
+
 
 ## Necessaire pour la connection au serveur mariadb
 # Connect to MariaDB Platform
@@ -146,81 +152,6 @@ class MatplotlibCanvas(FigureCanvas):
 
         # Refresh the canvas
         self.draw()
-        
-        
-    #Pour mettre 'a jour la base de donnees
-    def updateDB(self, sensor_data):
-        # Extract sensor values
-        anp_values = {
-            "anp35": sensor_data.anp35,
-            "anp34": sensor_data.anp34,
-            "anp39": sensor_data.anp39,
-            "anp38": sensor_data.anp38,
-            "anp37": sensor_data.anp37,
-            "anp36": sensor_data.anp36
-        }
-        # Decomposer et mettre dans un format pour envoyer au database
-        result = ",".join(str(value) for value in anp_values.values())
-         
-        valid_sensor_cnt = sum(1 for value in anp_values.values() if value > THRESHOLD)
-        
-        
-        
-        # try:
-            # cur.execute("SELECT Valid FROM SensorEntries ORDER BY Timestamp DESC LIMIT 1")
-            # last_valid_variable = cur.fetchone()  # Fetch the most recent entry
-            # last_valid_variable = last_valid_variable[0] if last_valid_variable else 0  # Default to 0 if no entry
-        # except mariadb.Error as e:
-            # print(f"Error fetching last entry: {e}")
-            # last_valid_variable = None
-            
-        # print("Last valid variable is", last_valid_variable)
-        
-        valid_entry = 0;
-        
-        # Ne comptabilisera pas si l'entree est très legere (a moins que la derniere ait ete 0)
-        if valid_sensor_cnt > 0 and valid_sensor_cnt <= 3:  #si seulement 3 bandes ou moins sont activees, invalid
-                valid_entry = 0
-        elif valid_sensor_cnt > 3: #plus de la motie des capteurs, pour que l'utilisateur ne "triche" pas
-                valid_entry = 1
-        else:
-                valid_entry = 2;    #unexpected
-        
-        try:        #insert information in db
-            cur.execute("INSERT INTO SensorEntries (Timestamp, SensorArray, Valid) VALUES (NOW(), %s, %s)", (result, valid_entry))
-               #cur.execute("INSERT INTO TrainingSessions (Name, TimeStarted, TimeEnded, HighestSpeed, LowestSpeed, AverageSpeed) VALUES (?, ?, ?, ?, ?, ?)",
-               #("Test_v4", time_started, time_ended, random.randint(50,57), random.randint(38,45), random.randint(45,50)))
-                
-        except mariadb.Error as e: 
-                print(f"Error: {e}")
-
-        conn.commit() 
-        print(f"Last Inserted ID: {cur.lastrowid}")
-        
-        # Calculate cadence/speed
-        
-        # Calculate cadence/speed
-        try:
-            # Fetch all Valid entries from the last 10 seconds
-            cur.execute("SELECT Valid FROM SensorEntries WHERE Timestamp >= NOW() - INTERVAL 10 SECOND")
-            valid_entries = [row[0] for row in cur.fetchall()]  # List of Valid values
-            #print(f"Valid entries in the last 10 seconds: {valid_entries}")
-
-            # Count only non-consecutive 1s
-            speed = 0
-            previous = None
-            for entry in valid_entries:
-                if entry == 1 and previous != 1:
-                    speed += 1
-                previous = entry
-
-            print(f"Speed (non-consecutive valid entries per 10 seconds): {speed}")
-    
-        except mariadb.Error as e:
-            print(f"Error calculating speed: {e}")
-            
-            
-            
         
 
 
@@ -347,6 +278,11 @@ class MainWindow(QMainWindow):
         # Add test button for manual sensor input
         self.buttonTestSensors = QPushButton("Set Test Sensor Values")
         self.buttonTestSensors.pressed.connect(self.setTestSensorValues)
+        
+        # Add button to open a new page
+        self.buttonNewPage = QPushButton("NP(workout log)")
+        self.buttonNewPage.pressed.connect(self.openNewPage)
+
 
         # Connecting text label setup
         self.connectingLabel = QLabel("Trying to connect to Bluetooth...", self)
@@ -397,13 +333,20 @@ class MainWindow(QMainWindow):
 
         # Group Box for Foot Plot
         plotGroupBox = QGroupBox("Foot Visualization")
-        plotLayout = QVBoxLayout()
+        plotLayout = QHBoxLayout()  #Horizontal layout pour avoir BPM a coté
         self.footPlot = MatplotlibCanvas()
 
         # Set a minimum size for the canvas
         self.footPlot.setMinimumSize(200, 100)
+        
+        # Add a label to display the number (e.g., Cadence or Speed)
+#        self.plotNumberLabel = QLabel("BPM: 0")
+        self.plotNumberLabel = QLabel(f"BPM: {calculated_BPM}")
+        self.plotNumberLabel.setAlignment(Qt.AlignCenter)
+        self.plotNumberLabel.setStyleSheet("font-size: 18px; font-weight: bold;")
 
-        plotLayout.addWidget(self.footPlot)
+        plotLayout.addWidget(self.footPlot, stretch=3)
+        plotLayout.addWidget(self.plotNumberLabel, stretch=1)  # Less space for the number
         plotGroupBox.setLayout(plotLayout)
 
         # Combine both sections in a horizontal layout
@@ -529,7 +472,18 @@ class MainWindow(QMainWindow):
 
         
         mainLayout.addWidget(self.buttonStartBLE)
-        mainLayout.addWidget(self.buttonTestSensors)
+        
+        
+        
+        
+        # Horizontal layout pour 2 boutons: set sensor values + new page pour workout log
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(self.buttonTestSensors)
+        buttonLayout.addWidget(self.buttonNewPage)
+        # Add the layout to the main layout
+        mainLayout.addLayout(buttonLayout)
+
+        
         mainLayout.addWidget(batteryGroupBox)      # Add the Battery group box
         mainLayout.addWidget(bpmGroupBox)          # Add the BPM Controls group box
         #mainLayout.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
@@ -579,6 +533,10 @@ class MainWindow(QMainWindow):
         self.updateAnalogValues(test_data)
         # Update the plot with the test values
         self.footPlot.update_plot(test_data)
+        
+    def openNewPage(self):
+        self.newWindow = NewWindow(cur, conn)  # Create an instance of the new page
+        self.newWindow.show()         # Show the new page
     
     # 29 nov 2024
 #    def setGraphValues(self, data):
@@ -593,10 +551,88 @@ class MainWindow(QMainWindow):
     def updateSliderLabel(self, value):
         self.sliderLabel.setText(f"Value: {value}")
 
-    def updateBPM(self, value):
-        self.bpmLabel.setText(f"BPM: {value}")
-        self.current_bpm = value
-        self.checkAndSendLightCommand()
+
+    def updateBPM(self, sensor_data):
+        updateBPM(sensor_data, self.plotNumberLabel, conn, cur, sample_rate, freq, THRESHOLD)
+
+       #Commented out because im moving it to another file
+    # # #sensor_data was previously value, fonction team ete24
+    # # def updateBPM(self, sensor_data):
+        # # # Extract sensor values
+        # # anp_values = {
+            # # "anp35": sensor_data.anp35,
+            # # "anp34": sensor_data.anp34,
+            # # "anp39": sensor_data.anp39,
+            # # "anp38": sensor_data.anp38,
+            # # "anp37": sensor_data.anp37,
+            # # "anp36": sensor_data.anp36
+        # # }
+        # # # Decomposer et mettre dans un format pour envoyer au database
+        # # result = ",".join(str(value) for value in anp_values.values())
+         
+        # # valid_sensor_cnt = sum(1 for value in anp_values.values() if value > THRESHOLD)
+                
+        # # try:
+            # # cur.execute("SELECT Valid FROM SensorEntries ORDER BY Timestamp DESC LIMIT 1")
+            # # last_valid_variable = cur.fetchone()  # Fetch the most recent entry
+            # # last_valid_variable = last_valid_variable[0] if last_valid_variable else 0  # Default to 0 if no entry
+        # # except mariadb.Error as e:
+            # # print(f"Error fetching last entry: {e}")
+            # # last_valid_variable = None
+            
+        # # print("Last valid variable is", last_valid_variable)
+        
+        # # valid_entry = 0;
+        
+        # # # Ne comptabilisera pas si l'entree est très legere (a moins que la derniere ait ete 0)
+        # # if valid_sensor_cnt > 0 and valid_sensor_cnt <= 3:  #si seulement 3 bandes ou moins sont activees, invalid
+                # # valid_entry = 0
+        # # elif valid_sensor_cnt > 3: #plus de la motie des capteurs, pour que l'utilisateur ne "triche" pas
+                # # valid_entry = 1
+        # # else:
+                # # valid_entry = 2;    #for 0,0,0,0,0
+                
+        # # if valid_entry != 9 and last_valid_variable !=12:
+            # # try:        #insert information in db
+                # # cur.execute("INSERT INTO SensorEntries (Timestamp, SensorArray, Valid) VALUES (NOW(), %s, %s)", (result, valid_entry))
+                   # # #cur.execute("INSERT INTO TrainingSessions (Name, TimeStarted, TimeEnded, HighestSpeed, LowestSpeed, AverageSpeed) VALUES (?, ?, ?, ?, ?, ?)",
+                   # # #("Test_v4", time_started, time_ended, random.randint(50,57), random.randint(38,45), random.randint(45,50)))
+                    
+            # # except mariadb.Error as e: 
+                    # # print(f"Error: {e}")
+
+            # # conn.commit() 
+            # # print(f"Last Inserted ID: {cur.lastrowid}")
+
+        
+        # # # Calculate cadence/speed
+        # # try:
+            # # # Fetch all Valid entries from the last 10 seconds
+            # # cur.execute("SELECT Valid FROM SensorEntries WHERE Timestamp >= NOW() - INTERVAL %s SECOND", (sample_rate,))
+            # # valid_entries = [row[0] for row in cur.fetchall()]  # List of Valid values
+            # # #print(f"Valid entries in the last 10 seconds: {valid_entries}")
+
+            # # # Count only non-consecutive 1s
+            # # speed = 0
+            # # previous = None
+            # # for entry in valid_entries:
+                # # if entry == 1 and previous != 1:
+                    # # speed += 1
+                # # previous = entry
+
+            # # print(f"Speed (non-consecutive valid entries per 10 seconds): {speed}")
+            
+            # # # Update the label directly
+            # # self.plotNumberLabel.setText(f"BPM: {speed * freq}")
+        # # except mariadb.Error as e:
+            # # print(f"Error calculating speed: {e}")    
+    
+    
+    
+    
+        # # # # # self.bpmLabel.setText(f"BPM: {value}")
+        # # # # # self.current_bpm = value
+        # # # # # self.checkAndSendLightCommand()
 
     def tapBPM(self):
         now = datetime.datetime.now()
@@ -632,7 +668,8 @@ class MainWindow(QMainWindow):
         self.workerBLE.signals.signalConnected.connect(self.updateBLEButton)
         self.workerBLE.signals.signalDataParsed.connect(self.updateAnalogValues)
         self.workerBLE.signals.signalDataParsed.connect(self.footPlot.update_plot)
-        self.workerBLE.signals.signalDataParsed.connect(self.footPlot.updateDB)
+     #   self.workerBLE.signals.signalDataParsed.connect(self.footPlot.updateDB)     #useless todelete
+        self.workerBLE.signals.signalDataParsed.connect(self.updateBPM)
        # self.workerBLE.signals.signalDataParsed.connect(MatplotlibCanvas.update_plot)       #29 nov 2024
         self.threadpool.start(self.workerBLE)
 
@@ -772,8 +809,24 @@ class MainWindow(QMainWindow):
     def CloseApp(self):
         # Method to close the app
         print("Closing the application.")
-        # Close mariadb Connection
+        # Delete sensorEntries table, updating workout and then closing mariadb connection
+        try:
+            # Delete all entries from SensorEntries
+            cur.execute("DELETE FROM SensorEntries")
+            
+            # Truncate the table to reset the AUTO_INCREMENT value
+            cur.execute("TRUNCATE TABLE SensorEntries")
+            
+            # Commit the transaction
+            conn.commit()
+        except mariadb.Error as e:
+            print(f"Error deleting or truncating SensorEntries: {e}")
+            
+        update_workout_data(cur,conn)
+        
+        cur.close()
         conn.close()
+        
         # Stop BLE worker if running
         if self.workerBLE is not None:
             self.workerBLE.stop()

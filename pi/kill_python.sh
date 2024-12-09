@@ -14,3 +14,6 @@ else
     done
     echo "All Python processes have been terminated."
 fi
+
+#mysql -Bse 'DELETE FROM database.table WHERE filed < CURDATE()- 5'
+
