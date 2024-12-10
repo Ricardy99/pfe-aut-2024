@@ -1,5 +1,6 @@
 
 import sys
+import subprocess
 import re
 from PyQt5.QtCore import QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot, QProcess, QTimer
 from PyQt5.QtGui import QColor, QBrush
@@ -7,8 +8,38 @@ from PyQt5.QtWidgets import (
     QApplication, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGroupBox, QWidget, QSlider, QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy, QStackedWidget, QSpacerItem
 )
 from bluepy import btle
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.patches as patches
 import time
 import datetime
+import mariadb
+
+from workout_log import NewWindow, calculateBPM, update_workout_data, calculate_speed_statistics
+
+#Declaration variables globables
+TROUBLESHOOTING = 0
+THRESHOLD = 1200    #Variable THRESHOLD, pour determiner sensibilité des capteurs FSR
+sample_rate = 30    #sample of steps per X seconds
+freq = 60 / sample_rate    #to get in BPM, X * (60/freq)
+
+## Necessaire pour la connection au serveur mariadb
+# Connect to MariaDB Platform
+try:
+    conn = mariadb.connect(
+        user="webuser",
+        password="password",
+        host="127.0.0.1",
+        port=3306,
+        database="pfedb"
+    )
+except mariadb.Error as e:
+    print(f"Error connecting to MariaDB Platform: {e}")
+    sys.exit(1)
+
+# Get Cursor
+cur = conn.cursor()
+
 
 #"""
 class SensorData:
@@ -39,7 +70,73 @@ class SensorData:
     def is_complete(self):
         return all(sensor is not None for sensor in [self.anp35, self.anp39, self.anp37, self.anp36, self.anp34, self.anp38])
 
-    
+# Class for foot graph
+class MatplotlibCanvas(FigureCanvas):
+    def __init__(self):
+        self.figure = Figure()
+        super().__init__(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        self.create_plot()
+
+    def create_plot(self):
+        # Initial plot setup
+        self.ax.clear()
+        outer_width = 20
+        outer_height = 10
+
+        # Outer rectangle
+        outer_rectangle = patches.Rectangle((0, 0), outer_width, outer_height, linewidth=2, edgecolor='black', facecolor='white')
+        self.ax.add_patch(outer_rectangle)
+
+        self.ax.set_aspect('equal')
+        self.ax.set_xlim(-1, outer_width + 1)
+        self.ax.set_ylim(-1, outer_height + 1)
+        self.ax.axis('off')
+
+    def update_plot(self, sensor_data):
+        # Clear previous rectangles
+        self.ax.clear()
+        self.create_plot()
+
+        # Extract sensor values
+        anp_values = {
+            "anp35": sensor_data.anp35,
+            "anp34": sensor_data.anp34,
+            "anp39": sensor_data.anp39,
+            "anp38": sensor_data.anp38,
+            "anp37": sensor_data.anp37,
+            "anp36": sensor_data.anp36
+        }
+
+        # Determine active/inactive states
+        pied = [1 if value and value > THRESHOLD else 0 for value in anp_values.values()]
+
+        # Add rectangles dynamically based on sensor data
+        def add_rectangle(init_x, init_y, width, height, color):
+            rectangle = patches.Rectangle((init_x, init_y), width, height, facecolor=color)
+            self.ax.add_patch(rectangle)
+
+        def create_6_rectangles(init_x, init_y, values):
+            init_heights = [
+                init_y,
+                init_y + 1.5 / 2,
+                init_y + 1.5 / 2 + 1.5,
+                init_y + 1.5 / 2 + 2 * 1.5,
+                init_y + 1.5 / 2 + 3 * 1.5,
+                init_y + 1.5 / 2 + 4 * 1.5,
+            ]
+            color = 'g' if sum(values) > 3 else 'r'
+            for i, value in enumerate(values):
+                if value == 1:
+                    height = 1.5 / 2 if i in [0, 5] else 1.5
+                    add_rectangle(init_x, init_heights[i], 3, height, color)
+
+        # Update the foot visualization
+        create_6_rectangles(3, 1.5, pied)
+        create_6_rectangles(14.5, 1.5, pied)
+
+        # Refresh the canvas
+        self.draw()
         
 class WorkerSignals(QObject):
     signalMsg = pyqtSignal(str)
@@ -173,14 +270,18 @@ class MainWindow(QMainWindow):
         # Add button to the workout page
         workoutPageButton = QPushButton("Start a workout")
         workoutPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget1))
+        
+        # Add button to open a new page (for workout log)
+        self.buttonNewPage = QPushButton("Workout history")
+        self.buttonNewPage.clicked.connect(self.openNewPage)
 
         # Add button to settings page
         settingsPageButton = QPushButton("Calibration")
         settingsPageButton.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.settingsPageWidget2))
         
         # Add a button to close the app
-        closeButton = QPushButton("Close App")
-        closeButton.clicked.connect(self.close)
+        self.closeButton = QPushButton("Close App")
+        self.closeButton.clicked.connect(self.closeApp)
 
         # Add Reset Button at the top of the screen
         self.buttonResetApp = QPushButton("Reset App")
@@ -197,12 +298,20 @@ class MainWindow(QMainWindow):
 
         # Add widget to the menu layout
         menuPageLayout.addWidget(menuPageTitle)
-        menuPageLayout.addWidget(workoutPageButton)
+        # menuPageLayout.addWidget(workoutPageButton)
+        buttonLayout = QHBoxLayout()            #le "start workout" et "workout history" seront a coté
+        buttonLayout.addWidget(workoutPageButton)
+        buttonLayout.addWidget(self.buttonNewPage)
+        # Add the layout to the main layout
+        menuPageLayout.addLayout(buttonLayout)
         menuPageLayout.addWidget(self.connectingLabel)
         menuPageLayout.addWidget(self.buttonStartBLE)
         menuPageLayout.addWidget(settingsPageButton)
         menuPageLayout.addWidget(self.buttonResetApp)
-        menuPageLayout.addWidget(closeButton)
+        menuPageLayout.addWidget(self.closeButton)
+        
+        # Horizontal layout pour 2 boutons: start workout + new page pour workout log
+
 
         self.menuPageWidget.setLayout(menuPageLayout)
         ##########################################################################################################
@@ -476,10 +585,13 @@ class MainWindow(QMainWindow):
         cadenceLayout.addLayout(consecutiveCountLayout)
         cadenceLayout.addWidget(self.cadenceFeedbackLabel)
         cadenceGroupBox.setLayout(cadenceLayout)
-
+        
+        #Pour avoir valeurs capteurs analog + graph a coté
+        sideBySideLayout = QHBoxLayout()
+        
         # Group Box for Analog Values Table
         analogGroupBox = QGroupBox("Analog Values")
-
+        analogLayout = QVBoxLayout()
         self.timestampLabel = QLabel("Timestamp: N/A")
         self.analogTable = QTableWidget(6, 1)  # 6 rows, 1 column
         # Remove header labels
@@ -488,12 +600,26 @@ class MainWindow(QMainWindow):
         self.analogTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.analogTable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 #        self.analogTable.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        
-        analogLayout = QVBoxLayout()
         analogLayout.addWidget(self.timestampLabel)
         analogLayout.addWidget(self.analogTable)
         analogGroupBox.setLayout(analogLayout)
 
+        # Add the Analog Group Box to the layout
+        sideBySideLayout.addWidget(analogGroupBox)
+        
+        # Group Box for Foot Plot
+        plotGroupBox = QGroupBox("Foot Visualization")
+        plotLayout = QHBoxLayout()  #Horizontal layout pour avoir BPM a coté
+        self.footPlot = MatplotlibCanvas()
+        
+        # Set a minimum size for the canvas
+        self.footPlot.setMinimumSize(200, 250)
+        plotLayout.addWidget(self.footPlot)
+        plotGroupBox.setLayout(plotLayout)
+        
+        # Add the Foot Plot Group Box to the layout
+        sideBySideLayout.addWidget(plotGroupBox)
+        
         # Add button to the menu page
         menuPageButton_2 = QPushButton("End workout")
         menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.feedbackPageWidget))
@@ -503,7 +629,12 @@ class MainWindow(QMainWindow):
         workoutPageLayout.addWidget(workoutPageTitle)
         workoutPageLayout.addWidget(timerGroupBox)
         workoutPageLayout.addWidget(cadenceGroupBox)
-        workoutPageLayout.addWidget(analogGroupBox)
+      #  workoutPageLayout.addWidget(analogGroupBox)
+      #  workoutPageLayout.addWidget(analogGroupBox)
+        if TROUBLESHOOTING == 1:
+            workoutPageLayout.addLayout(sideBySideLayout)
+        else:
+            workoutPageLayout.addWidget(plotGroupBox)
         workoutPageLayout.addWidget(menuPageButton_2)
 
         self.workoutPageWidget.setLayout(workoutPageLayout)
@@ -695,10 +826,20 @@ class MainWindow(QMainWindow):
             bpm = int(60 / avg_interval)
             self.bpmSlider.setValue(bpm)
             self.updateBPM(bpm)
+            
+    # def tapBPM(self, sensor_data):
+        # bpm = calculateBPM(sensor_data, conn, cur, sample_rate, freq, THRESHOLD)
+        # self.bpmSlider.setValue(bpm)
+        # self.updateBPM(bpm)
 
     def updateFSR(self, value):
         self.fsrLabel.setText(f"FSR Value: {value}")
         self.fsr_value = value
+    
+    #Fonction pour ouvrir page workout    
+    def openNewPage(self):
+        self.newWindow = NewWindow(cur, conn)  # Create an instance of the new page
+        self.newWindow.show()         # Show the new page
 
     def startBLE(self):
         # Disable the button after it's clicked
@@ -715,6 +856,8 @@ class MainWindow(QMainWindow):
         self.workerBLE.signals.signalConnecting.connect(self.setConnectingLabelVisible)
         self.workerBLE.signals.signalConnected.connect(self.updateBLEButton)
         self.workerBLE.signals.signalDataParsed.connect(self.updateAnalogValues)
+        self.workerBLE.signals.signalDataParsed.connect(self.footPlot.update_plot)  #For foot graph
+        #self.workerBLE.signals.signalDataParsed.connect(self.updateBPM2)  ###update and calculate BPM
         self.threadpool.start(self.workerBLE)
 
     def sendTare(self):
@@ -818,10 +961,17 @@ class MainWindow(QMainWindow):
             avg_interval = sum(intervals) / len(intervals)
             bpm = int(60 / avg_interval)
             print(f"Rhythm for {sensor_key}: {bpm} BPM")
-
             # Update cadence label with the calculated BPM
             self.updateCadence(bpm)
             self.updateCounters(sensor_key)
+            
+    
+     # def registerExceed(self, sensor_key, sensor_data):
+         # bpm = calculateBPM(sensor_data, conn, cur, sample_rate, freq, THRESHOLD)
+         # # Update cadence label with the calculated BPM
+         # self.updateCadence(bpm)
+         # self.updateCounters(sensor_key)
+    
 
     def updateCadence(self, bpm):
         self.cadenceLabel.setText(f"Cadence: {bpm} BPM")
@@ -880,6 +1030,33 @@ class MainWindow(QMainWindow):
         print("Resetting the application...")
         QProcess.startDetached(sys.executable, sys.argv)  # Restart the app
         QApplication.exit()
+        
+    def closeApp(self):
+        #Closing app. 
+        print("Closing the application.")
+        # Delete sensorEntries table, updating workout and then closing mariadb connection
+        try:
+            # Delete SensorEntries table
+            cur.execute("DELETE FROM SensorEntries")
+            cur.execute("TRUNCATE TABLE SensorEntries")
+            
+            # Commit the transaction
+            conn.commit()
+        except mariadb.Error as e:
+            print(f"Error deleting or truncating SensorEntries: {e}")
+            
+        update_workout_data(cur,conn)
+        
+        cur.close()
+        conn.close()
+        
+        # Stop BLE worker if running
+        if self.workerBLE is not None:
+            self.workerBLE.stop()
+            self.threadpool.waitForDone()  # Ensure the threadpool completes all tasks
+        
+        QApplication.exit(0)
+        subprocess.call(['sh','kill_python.sh'])
         
         
 

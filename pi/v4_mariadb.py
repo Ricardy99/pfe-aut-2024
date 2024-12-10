@@ -356,6 +356,8 @@ class MainWindow(QMainWindow):
 
         # Add the horizontal layout to the main layout
         mainLayout.addLayout(sideBySideLayout)
+        
+       
 
         
         # # analogLayout = QVBoxLayout()
