@@ -69,7 +69,7 @@ def update_workout_data(cur, conn):
     workout_end_time = datetime.now()
     
     average_speed, highest_speed = calculate_speed_statistics()
-    if workout_start_time!= workout_end_time and average_speed != None and average_speed != 0:
+    if workout_start_time!= workout_end_time and average_speed != None:
         try:
             cur.execute("INSERT INTO TrainingSessions (Name, TimeStarted, TimeEnded, AverageSpeed, HighestSpeed) VALUES (%s, %s, %s, %s, %s)",
                         (name, workout_start_time, workout_end_time, average_speed, highest_speed))

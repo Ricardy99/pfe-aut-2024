@@ -34,6 +34,7 @@ from workout_log import NewWindow, updateBPM, update_workout_data, calculate_spe
 
 #Declaration des variables globales
 THRESHOLD = 1200    #Variable THRESHOLD, pour determiner sensibilité des capteurs FSR
+NB_BANDE_FSR_REQUISES = 4      #Nombres de bandes FSR requises/6 pour qu'un step compte
 calculated_BPM = 0
 sample_rate = 30    #sample of steps per X seconds
 freq = 60 / sample_rate    #to get in BPM, X * (60/freq)
@@ -140,7 +141,7 @@ class MatplotlibCanvas(FigureCanvas):
                 init_y + 1.5 / 2 + 3 * 1.5,
                 init_y + 1.5 / 2 + 4 * 1.5,
             ]
-            color = 'g' if sum(values) > 3 else 'r'
+            color = 'g' if sum(values) >= NB_BANDE_FSR_REQUISES else 'r'
             for i, value in enumerate(values):
                 if value == 1:
                     height = 1.5 / 2 if i in [0, 5] else 1.5
@@ -300,8 +301,8 @@ class MainWindow(QMainWindow):
         weightGroupBox = QGroupBox("Weight")
         self.weightLabel = QLabel("Weight: N/A")
         weightLayout = QVBoxLayout()
-        weightLayout.addWidget(self.weightLabel)
-        weightGroupBox.setLayout(weightLayout)
+        #weightLayout.addWidget(self.weightLabel)
+        # weightGroupBox.setLayout(weightLayout)
 
         # # # Group Box for Analog Values Table
         # # analogGroupBox = QGroupBox("Analog Values")
@@ -380,42 +381,42 @@ class MainWindow(QMainWindow):
         #plotGroupBox.setMinimumHeight(250)
 
         # Group Box for Tare Controls
-        tareGroupBox = QGroupBox("Tare")
-        tareLayout = QVBoxLayout()
+        # tareGroupBox = QGroupBox("Tare")
+        # tareLayout = QVBoxLayout()
 
-        buttonTare = QPushButton("Tare")
-        buttonTare.pressed.connect(self.sendTare)
+        # buttonTare = QPushButton("Tare")
+        # buttonTare.pressed.connect(self.sendTare)
 
-        tareLayout.addWidget(buttonTare)
-        tareGroupBox.setLayout(tareLayout)
+        # tareLayout.addWidget(buttonTare)
+        # tareGroupBox.setLayout(tareLayout)
 
-        # Group Box for Calibrate Controls
-        calGroupBox = QGroupBox("Calibrate Load Cells")
-        calLayout = QVBoxLayout()
+        # # Group Box for Calibrate Controls
+        # calGroupBox = QGroupBox("Calibrate Load Cells")
+        # calLayout = QVBoxLayout()
 
-        sliderLayout = QHBoxLayout()
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 300)
-        self.slider.setTickInterval(10)
-        self.slider.setTickPosition(QSlider.TicksBelow)
-        self.slider.setValue(0)
-        self.sliderLabel = QLabel("Value: 0")
+        # sliderLayout = QHBoxLayout()
+        # self.slider = QSlider(Qt.Horizontal)
+        # self.slider.setRange(0, 300)
+        # self.slider.setTickInterval(10)
+        # self.slider.setTickPosition(QSlider.TicksBelow)
+        # self.slider.setValue(0)
+        # self.sliderLabel = QLabel("Value: 0")
 
-        self.slider.valueChanged.connect(self.updateSliderLabel)
+        # self.slider.valueChanged.connect(self.updateSliderLabel)
 
         self.unitToggle = QComboBox()
         self.unitToggle.addItems(["kg", "lbs"])
 
-        sliderLayout.addWidget(self.slider)
-        sliderLayout.addWidget(self.sliderLabel)
-        sliderLayout.addWidget(self.unitToggle)
+        # sliderLayout.addWidget(self.slider)
+        # sliderLayout.addWidget(self.sliderLabel)
+        # sliderLayout.addWidget(self.unitToggle)
 
-        buttonCalibrateBLE = QPushButton("Calibrate")
-        buttonCalibrateBLE.pressed.connect(self.sendCalibrateBLE)
+        # buttonCalibrateBLE = QPushButton("Calibrate")
+        # buttonCalibrateBLE.pressed.connect(self.sendCalibrateBLE)
 
-        calLayout.addLayout(sliderLayout)
-        calLayout.addWidget(buttonCalibrateBLE)
-        calGroupBox.setLayout(calLayout)
+        # calLayout.addLayout(sliderLayout)
+        # calLayout.addWidget(buttonCalibrateBLE)
+        # calGroupBox.setLayout(calLayout)
 
         # Group Box for BPM Controls
         bpmGroupBox = QGroupBox("BPM Controls")
@@ -487,15 +488,15 @@ class MainWindow(QMainWindow):
 
         
         mainLayout.addWidget(batteryGroupBox)      # Add the Battery group box
-        mainLayout.addWidget(bpmGroupBox)          # Add the BPM Controls group box
+        #mainLayout.addWidget(bpmGroupBox)          # Add the BPM Controls group box
         #mainLayout.addWidget(cadenceGroupBox)      # Add the Cadence group box near BPM controls
         #mainLayout.addWidget(self.connectingLabel) # Add connecting text label to the layout
-        mainLayout.addWidget(weightGroupBox)       # Add the weight group box here
+        #mainLayout.addWidget(weightGroupBox)       # Add the weight group box here
         # # mainLayout.addWidget(analogGroupBox)       # Add the analog values table group box
         # # mainLayout.addWidget(plotGroupBox)         # Foot Visualization
         # # mainLayout.addWidget(tareGroupBox)
-        mainLayout.addWidget(calGroupBox)
-        mainLayout.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
+       # mainLayout.addWidget(calGroupBox)
+       # mainLayout.addWidget(fsrGroupBox)          # Add the Calibrate FSR group box
         
 
         widget = QWidget()

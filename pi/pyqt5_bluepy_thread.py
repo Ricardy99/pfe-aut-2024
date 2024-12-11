@@ -624,6 +624,7 @@ class MainWindow(QMainWindow):
         menuPageButton_2 = QPushButton("End workout")
         menuPageButton_2.clicked.connect(lambda: self.stackedWidget.setCurrentWidget(self.feedbackPageWidget))
         menuPageButton_2.clicked.connect(self.stopTimer)
+        menuPageButton_2.clicked.connect(self.endWorkout)
 
         # Add widgets to layout
         workoutPageLayout.addWidget(workoutPageTitle)
@@ -713,6 +714,11 @@ class MainWindow(QMainWindow):
         self.consecutiveOnPace_count = 0
         self.consecutiveSloweOrFaster_count = 0
         self.consecutiveOffBeatCount_allowed = 0
+        #Last minute test
+        self.calculated_speeds = []
+        self.average_speed = 0
+        self.max_speed = 0
+        self.start_time =  0
         
     def resetCounters(self):
         self.onPace_count = 0
@@ -728,6 +734,8 @@ class MainWindow(QMainWindow):
         self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
         self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
         self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
+        #Last minute test
+        self.calculated_speeds = []
 
     def updateCounters(self, sensor_key):
         now = datetime.datetime.now()
@@ -741,6 +749,14 @@ class MainWindow(QMainWindow):
             self.consecutiveOnPaceCountLabel.setText(f"Consecutive on pace count: {self.consecutiveOnPace_count}")
             self.consecutiveSlowerCountLabel.setText(f"Consecutive slower count: {self.consecutiveSlower_count}")
             self.consecutiveFasterCountLabel.setText(f"Consecutive faster count: {self.consecutiveFaster_count}")
+            #Last minute
+            if not self.calculated_speeds:  # Checks if the list is empty
+                self.start_time = now  # Get the current time in seconds
+            if self.calculated_speeds is None:
+                self.calculated_speeds = []
+            
+            self.calculated_speeds.append(self.current_cadence)
+            
             if self.lower_bound <= self.current_cadence <= self.upper_bound:
                     self.consecutiveFaster_count = 0
                     self.consecutiveOnPace_count += 1
@@ -1024,6 +1040,27 @@ class MainWindow(QMainWindow):
         self.stopTimer()
         self.updateStepsFeedbackLabel()
         self.stackedWidget.setCurrentWidget(self.feedbackPageWidget)
+        
+        #Last minute, a tester
+        if len(self.calculated_speeds) > 0:
+            average_speed = sum(self.calculated_speeds) / len(self.calculated_speeds)
+            highest_speed = max(self.calculated_speeds)
+        else:
+            print("No speed data available to calculate statistics.")
+            average_speed = highest_speed = None
+        
+        workout_end_time = datetime.datetime.now()
+    
+        if self.start_time!= workout_end_time and average_speed != None and average_speed != 0:
+            try:
+                cur.execute("INSERT INTO TrainingSessions (Name, TimeStarted, TimeEnded, AverageSpeed, HighestSpeed) VALUES (%s, %s, %s, %s, %s)",
+                            ("Default", self.start_time, workout_end_time, average_speed, highest_speed))
+                conn.commit()
+                print(f"Last Inserted ID: {cur.lastrowid}")
+            except mariadb.Error as e:
+                print(f"Error inserting into TrainingSessions: {e}")
+        else:
+            print("Table was not updated")
 
     def resetApp(self):
         # Method to reset the app
@@ -1045,7 +1082,7 @@ class MainWindow(QMainWindow):
         except mariadb.Error as e:
             print(f"Error deleting or truncating SensorEntries: {e}")
             
-        update_workout_data(cur,conn)
+        #update_workout_data(cur,conn)
         
         cur.close()
         conn.close()
@@ -1062,7 +1099,7 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
-#window.resize(1024, 600)
-#window.show()
-window.showFullScreen()
+window.resize(1024, 600)
+window.show()
+#window.showFullScreen()
 app.exec()
